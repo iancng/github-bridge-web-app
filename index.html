@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitDeploy Bridge</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar for the log window */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .log-window::-webkit-scrollbar { width: 8px; }
+        .log-window::-webkit-scrollbar-track { background: #1e293b; }
+        .log-window::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        
+        /* Modal transition */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.2s ease-out; }
+        .modal-exit { opacity: 1; transform: scale(1); }
+        .modal-exit-active { opacity: 0; transform: scale(0.95); transition: all 0.2s ease-in; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 font-sans min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <div class="w-full max-w-3xl bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden relative">
+        
+        <!-- Header -->
+        <div class="bg-slate-950 p-6 flex items-center justify-between border-b border-slate-700">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-blue-600 rounded-lg">
+                    <i data-lucide="upload-cloud" class="text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white">GitDeploy Bridge</h1>
+                    <p class="text-slate-400 text-xs uppercase tracking-wider">GitHub.io Deployer</p>
+                </div>
+            </div>
+            <!-- User Profile Area -->
+            <div id="user-profile" class="hidden flex items-center gap-4">
+                 <div class="flex flex-col items-end">
+                    <div class="flex items-center gap-2">
+                        <span id="user-login" class="text-sm font-bold text-white"></span>
+                        <img id="user-avatar" src="" alt="" class="w-6 h-6 rounded-full border border-slate-600">
+                    </div>
+                    <span id="token-expiry" class="text-[10px] text-slate-500 font-mono mt-0.5"></span>
+                 </div>
+                 <button onclick="handleLogout()" class="text-xs text-red-400 hover:text-red-300 underline" title="Clear Token">
+                    Sign Out
+                 </button>
+            </div>
+        </div>
+
+        <!-- Content Body -->
+        <div class="p-6 md:p-8">
+            
+            <!-- Step Indicators -->
+            <div class="flex items-center justify-center space-x-4 mb-8" id="step-indicator">
+                <!-- Steps injected via JS -->
+            </div>
+
+            <!-- STEP 1: CONFIGURATION -->
+            <div id="step-1" class="space-y-6">
+                <div class="bg-blue-900/20 border border-blue-800/50 p-4 rounded-lg flex gap-4">
+                    <div class="p-2 bg-blue-900/50 rounded-md h-fit">
+                        <i data-lucide="settings" class="text-blue-400 w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-blue-100 mb-1">Setup Required</h3>
+                        <p class="text-sm text-blue-200/70">
+                            You need a <strong>GitHub Personal Access Token (Classic)</strong> with <code>repo</code> permissions.
+                            <br>
+                            This runs entirely in your browser. Your token is saved to <code>localStorage</code> for convenience.
+                        </p>
+                        <a href="https://github.com/settings/tokens/new?scopes=repo,workflow" 
+                           target="_blank" 
+                           class="text-xs text-blue-400 hover:text-blue-300 underline mt-2 inline-flex items-center gap-1">
+                            Generate Token <i data-lucide="external-link" class="w-3 h-3"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">GitHub Personal Access Token</label>
+                    <input type="password" id="input-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-600 focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                </div>
+
+                <div id="error-message" class="hidden p-3 bg-red-900/20 border border-red-800/50 rounded-lg flex items-center gap-2 text-red-300 text-sm">
+                    <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                    <span id="error-text"></span>
+                </div>
+
+                <button onclick="handleVerifyToken()" id="btn-verify"
+                    class="w-full py-3 rounded-lg font-bold text-white flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20 transition-all">
+                    <i data-lucide="github" class="w-5 h-5"></i> Connect to GitHub
+                </button>
+            </div>
+
+            <!-- STEP 2: CODE INPUT -->
+            <div id="step-2" class="hidden space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Repository Name</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="input-repo-name" value="my-web-app"
+                                class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            <button onclick="openRepoModal()" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white p-3 rounded-lg transition-colors" title="Browse Repositories">
+                                <i data-lucide="folder-search" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Tip: Name it <strong><span id="username-hint">username</span>.github.io</strong> for your main site.
+                        </p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Target Filename</label>
+                        <div class="relative">
+                            <i data-lucide="file-code" class="absolute left-3 top-3.5 text-slate-500 w-4 h-4"></i>
+                            <input type="text" id="input-filename" value="index.html"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col h-96">
+                    <label class="flex items-center justify-between text-sm font-medium text-slate-400 mb-2">
+                        <span>Application Code</span>
+                        <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Paste HTML/Code Here</span>
+                    </label>
+                    <textarea id="input-code"
+                        class="flex-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-4 font-mono text-sm text-green-400 focus:ring-2 focus:ring-green-500/50 outline-none resize-none"
+                        spellcheck="false"><!DOCTYPE html>
+<html>
+<head>
+    <title>Deployed via GitDeploy</title>
+</head>
+<body style="background: #111; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh;">
+    <h1>Hello World</h1>
+</body>
+</html></textarea>
+                </div>
+
+                <div class="flex gap-4">
+                    <button onclick="handleLogout()"
+                        class="px-6 py-3 rounded-lg font-medium text-slate-300 hover:bg-slate-700 transition-colors">
+                        Logout
+                    </button>
+                    <button onclick="handleDeploy()"
+                        class="flex-1 bg-green-600 hover:bg-green-500 text-white rounded-lg py-3 font-bold shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 transition-all">
+                        <i data-lucide="upload-cloud" class="w-5 h-5"></i> Deploy to GitHub Pages
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 3 & 4: DEPLOYMENT LOGS -->
+            <div id="step-3" class="hidden space-y-6">
+                <div id="log-container" class="log-window bg-black rounded-lg border border-slate-800 p-4 font-mono text-sm h-80 overflow-y-auto flex flex-col gap-2 shadow-inner">
+                    <!-- Logs go here -->
+                </div>
+
+                <div id="success-panel" class="hidden bg-green-900/20 border border-green-800 p-6 rounded-xl flex flex-col items-center text-center space-y-4 animate-bounce-in">
+                    <div class="p-4 bg-green-500 rounded-full shadow-lg shadow-green-500/30">
+                        <i data-lucide="check-circle" class="text-white w-8 h-8"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-white mb-2">Deployment Successful!</h2>
+                        <p class="text-slate-400 max-w-md mx-auto">
+                            Your code has been pushed. GitHub Pages is building your site now (usually takes 1-2 mins).
+                        </p>
+                    </div>
+                    
+                    <div class="flex flex-col w-full gap-3 mt-4">
+                        <a id="btn-visit-site" href="#" target="_blank"
+                            class="w-full bg-white text-green-900 hover:bg-slate-100 py-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all">
+                            Visit Live Site <i data-lucide="external-link" class="w-5 h-5"></i>
+                        </a>
+                        
+                        <a id="btn-view-source" href="#" target="_blank"
+                            class="w-full bg-slate-800 text-slate-300 hover:bg-slate-700 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all">
+                            View Source Code <i data-lucide="code" class="w-5 h-5"></i>
+                        </a>
+
+                        <button onclick="resetForNewDeployment()"
+                            class="w-full bg-blue-600 text-white hover:bg-blue-500 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all mt-2">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Deploy Another App
+                        </button>
+                    </div>
+                </div>
+
+                <div id="deploy-error" class="hidden p-4 bg-red-900/20 border border-red-800 rounded-lg flex flex-col gap-2 text-center items-center">
+                    <i data-lucide="alert-circle" class="text-red-500 w-8 h-8"></i>
+                    <h3 class="text-red-200 font-bold">Deployment Failed</h3>
+                    <p id="deploy-error-msg" class="text-red-300/80 text-sm"></p>
+                    <button onclick="setStep(2)"
+                        class="mt-2 px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-100 rounded border border-red-700">
+                        Try Again
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- REPO SELECTION MODAL -->
+    <div id="repo-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-800 w-full max-w-lg rounded-xl shadow-2xl border border-slate-700 flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50 rounded-t-xl">
+                <h3 class="font-bold text-white flex items-center gap-2">
+                    <i data-lucide="git-fork" class="w-4 h-4 text-blue-400"></i> Select Repository
+                </h3>
+                <button onclick="closeRepoModal()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div id="repo-list-container" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <!-- Repo items injected here -->
+                <div class="flex items-center justify-center h-40 text-slate-500">
+                    <i data-lucide="loader-2" class="w-6 h-6 animate-spin mr-2"></i> Loading repositories...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- GitHub API Wrapper ---
+        const GitHubAPI = {
+            baseUrl: 'https://api.github.com',
+
+            async request(endpoint, method = 'GET', token, body = null) {
+                const headers = {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                };
+                const config = { method, headers };
+                if (body) config.body = JSON.stringify(body);
+
+                const response = await fetch(`${this.baseUrl}${endpoint}`, config);
+                let data;
+                try { data = await response.json(); } catch (e) { data = null; }
+
+                if (!response.ok) {
+                    throw new Error(data?.message || `GitHub API Error: ${response.status}`);
+                }
+                
+                // Return data and headers (headers needed for expiration check)
+                return { data, headers: response.headers };
+            },
+
+            async getUser(token) { 
+                const res = await this.request('/user', 'GET', token);
+                const expiry = res.headers.get('github-authentication-token-expiration');
+                return { ...res.data, tokenExpiry: expiry };
+            },
+
+            async getRepo(token, owner, repo) {
+                try { 
+                    const res = await this.request(`/repos/${owner}/${repo}`, 'GET', token); 
+                    return res.data;
+                } catch (e) { return null; }
+            },
+
+            async listRepos(token) {
+                // Fetch updated first, per_page 100
+                const res = await this.request('/user/repos?sort=updated&per_page=100&type=owner', 'GET', token);
+                return res.data;
+            },
+
+            async createRepo(token, name, description) {
+                const res = await this.request('/user/repos', 'POST', token, {
+                    name, description, private: false, auto_init: true
+                });
+                return res.data;
+            },
+
+            async createFile(token, owner, repo, path, content, message) {
+                let sha = null;
+                try {
+                    const res = await this.request(`/repos/${owner}/${repo}/contents/${path}`, 'GET', token);
+                    sha = res.data.sha;
+                } catch (e) {}
+
+                const encodedContent = btoa(unescape(encodeURIComponent(content)));
+                const body = { message, content: encodedContent };
+                if (sha) body.sha = sha;
+
+                const res = await this.request(`/repos/${owner}/${repo}/contents/${path}`, 'PUT', token, body);
+                return res.data;
+            },
+
+            async enablePages(token, owner, repo, branch = 'main') {
+                try {
+                    await this.request(`/repos/${owner}/${repo}/pages`, 'GET', token);
+                    return { status: 'already_enabled' };
+                } catch (e) {}
+                
+                const res = await this.request(`/repos/${owner}/${repo}/pages`, 'POST', token, {
+                    source: { branch: branch, path: '/' }
+                });
+                return res.data;
+            }
+        };
+
+        // --- App State ---
+        const state = {
+            step: 1,
+            token: '',
+            username: '',
+            userAvatar: '',
+            repoName: 'my-web-app',
+            fileName: 'index.html',
+            deployedUrl: ''
+        };
+
+        // --- Initialization ---
+        window.onload = function() {
+            const savedToken = localStorage.getItem('gh_token');
+            if (savedToken) {
+                document.getElementById('input-token').value = savedToken;
+                handleVerifyToken(); 
+            }
+            lucide.createIcons();
+            renderStepIndicator();
+        };
+
+        // --- UI Functions ---
+        
+        function setStep(step) {
+            state.step = step;
+            document.getElementById('step-1').classList.add('hidden');
+            document.getElementById('step-2').classList.add('hidden');
+            document.getElementById('step-3').classList.add('hidden');
+            document.getElementById(`step-${step}`).classList.remove('hidden');
+            renderStepIndicator();
+        }
+
+        function resetForNewDeployment() {
+            state.deployedUrl = '';
+            document.getElementById('input-repo-name').value = '';
+            document.getElementById('log-container').innerHTML = '';
+            document.getElementById('success-panel').classList.add('hidden');
+            setStep(2);
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('gh_token');
+            state.token = '';
+            state.username = '';
+            document.getElementById('user-profile').classList.add('hidden');
+            document.getElementById('input-token').value = '';
+            document.getElementById('log-container').innerHTML = '';
+            setStep(1);
+        }
+
+        function renderStepIndicator() {
+            const steps = [1, 2, 3];
+            const container = document.getElementById('step-indicator');
+            container.innerHTML = steps.map(s => `
+                <div class="flex items-center ${s < 3 ? 'flex-1' : ''}">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all
+                        ${state.step === s ? 'bg-blue-600 text-white shadow-lg scale-110' : 
+                          state.step > s ? 'bg-green-500 text-white' : 'bg-slate-700 text-slate-400'}">
+                        ${state.step > s ? '<i data-lucide="check" class="w-4 h-4"></i>' : s}
+                    </div>
+                    ${s < 3 ? `<div class="h-1 w-full mx-2 rounded ${state.step > s ? 'bg-green-500' : 'bg-slate-700'}"></div>` : ''}
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function addLog(msg, type = 'info') {
+            const container = document.getElementById('log-container');
+            const colorClass = type === 'error' ? 'text-red-400' : 
+                               type === 'success' ? 'text-green-400' : 
+                               type === 'warning' ? 'text-yellow-400' : 'text-blue-300';
+            
+            const div = document.createElement('div');
+            div.className = `flex gap-3 ${colorClass}`;
+            div.innerHTML = `<span class="opacity-50 font-mono">[${new Date().toLocaleTimeString()}]</span> <span>${type === 'info' ? '> ' : ''}${msg}</span>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // --- Repo Modal Functions ---
+
+        function openRepoModal() {
+            const modal = document.getElementById('repo-modal');
+            const listContainer = document.getElementById('repo-list-container');
+            
+            modal.classList.remove('hidden');
+            listContainer.innerHTML = `<div class="flex items-center justify-center h-40 text-slate-500"><i data-lucide="loader-2" class="w-6 h-6 animate-spin mr-2"></i> Loading repositories...</div>`;
+            lucide.createIcons();
+
+            // Fetch Repos
+            GitHubAPI.listRepos(state.token).then(repos => {
+                if (!repos || repos.length === 0) {
+                    listContainer.innerHTML = `<div class="text-center p-8 text-slate-500">No repositories found.</div>`;
+                    return;
+                }
+
+                listContainer.innerHTML = repos.map(repo => `
+                    <div onclick="selectRepo('${repo.name}')" 
+                         class="p-3 hover:bg-slate-700/50 rounded-lg cursor-pointer border border-transparent hover:border-slate-600 transition-all group">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium text-slate-200 group-hover:text-blue-400">${repo.name}</span>
+                            <span class="text-xs ${repo.private ? 'bg-slate-700 text-slate-400' : 'bg-green-900/30 text-green-400'} px-2 py-0.5 rounded">
+                                ${repo.private ? 'Private' : 'Public'}
+                            </span>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1 flex justify-between">
+                            <span>${repo.description || 'No description'}</span>
+                            <span>Updated: ${new Date(repo.updated_at).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }).catch(err => {
+                listContainer.innerHTML = `<div class="text-center p-8 text-red-400">Error loading repos: ${err.message}</div>`;
+            });
+        }
+
+        function closeRepoModal() {
+            document.getElementById('repo-modal').classList.add('hidden');
+        }
+
+        function selectRepo(name) {
+            document.getElementById('input-repo-name').value = name;
+            closeRepoModal();
+        }
+
+        // --- Logic Handlers ---
+
+        async function handleVerifyToken() {
+            const tokenInput = document.getElementById('input-token');
+            const errorDiv = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+            const btn = document.getElementById('btn-verify');
+            const expiryLabel = document.getElementById('token-expiry');
+
+            state.token = tokenInput.value.trim();
+            if (!state.token) return;
+
+            btn.innerHTML = `<i data-lucide="loader-2" class="animate-spin w-5 h-5"></i> Verifying...`;
+            btn.disabled = true;
+            errorDiv.classList.add('hidden');
+
+            try {
+                const user = await GitHubAPI.getUser(state.token);
+                state.username = user.login;
+                state.userAvatar = user.avatar_url;
+
+                localStorage.setItem('gh_token', state.token);
+
+                document.getElementById('user-profile').classList.remove('hidden');
+                document.getElementById('user-avatar').src = state.userAvatar;
+                document.getElementById('user-login').textContent = state.username;
+                document.getElementById('username-hint').textContent = state.username;
+
+                if (user.tokenExpiry) {
+                    const date = new Date(user.tokenExpiry);
+                    expiryLabel.textContent = `Expires: ${date.toLocaleDateString()}`;
+                } else {
+                    expiryLabel.textContent = '';
+                }
+
+                setStep(2);
+            } catch (err) {
+                errorText.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+                localStorage.removeItem('gh_token');
+            } finally {
+                btn.innerHTML = `<i data-lucide="github" class="w-5 h-5"></i> Connect to GitHub`;
+                btn.disabled = false;
+                lucide.createIcons();
+            }
+        }
+
+        async function handleDeploy() {
+            const repoInput = document.getElementById('input-repo-name');
+            const fileInput = document.getElementById('input-filename');
+            const codeInput = document.getElementById('input-code');
+            const successPanel = document.getElementById('success-panel');
+            const errorPanel = document.getElementById('deploy-error');
+            const logContainer = document.getElementById('log-container');
+
+            state.repoName = repoInput.value.trim().replace(/ /g, '-');
+            state.fileName = fileInput.value.trim();
+            const codeContent = codeInput.value;
+
+            setStep(3);
+            logContainer.innerHTML = ''; 
+            successPanel.classList.add('hidden');
+            errorPanel.classList.add('hidden');
+
+            try {
+                addLog('Starting deployment sequence...', 'info');
+
+                addLog(`Checking for repository "${state.repoName}"...`, 'info');
+                let repo = await GitHubAPI.getRepo(state.token, state.username, state.repoName);
+
+                if (!repo) {
+                    addLog(`Repository not found. Creating "${state.repoName}"...`, 'info');
+                    repo = await GitHubAPI.createRepo(state.token, state.repoName, 'Deployed via GitDeploy Bridge');
+                    addLog('Repository created successfully.', 'success');
+                    await new Promise(r => setTimeout(r, 2000)); 
+                } else {
+                    addLog('Repository exists. Using existing repo.', 'success');
+                }
+
+                addLog(`Committing ${state.fileName} to main branch...`, 'info');
+                await GitHubAPI.createFile(state.token, state.username, state.repoName, state.fileName, codeContent, 'Deploy via GitDeploy');
+                addLog('File committed successfully.', 'success');
+
+                addLog('Configuring GitHub Pages...', 'info');
+                try {
+                    await GitHubAPI.enablePages(state.token, state.username, state.repoName);
+                    addLog('GitHub Pages trigger sent.', 'success');
+                } catch (err) {
+                    addLog(`Note: ${err.message}`, 'warning');
+                }
+
+                let finalUrl = '';
+                if (state.repoName.toLowerCase() === `${state.username.toLowerCase()}.github.io`) {
+                    finalUrl = `https://${state.username}.github.io/`;
+                } else {
+                    finalUrl = `https://${state.username}.github.io/${state.repoName}/`;
+                }
+                
+                state.deployedUrl = finalUrl;
+                addLog(`Target URL calculated: ${finalUrl}`, 'info');
+                addLog('Deployment sequence finished!', 'success');
+
+                document.getElementById('btn-visit-site').href = finalUrl;
+                document.getElementById('btn-view-source').href = `https://github.com/${state.username}/${state.repoName}`;
+                successPanel.classList.remove('hidden');
+
+            } catch (err) {
+                addLog(`Error: ${err.message}`, 'error');
+                document.getElementById('deploy-error-msg').textContent = err.message;
+                errorPanel.classList.remove('hidden');
+            }
+        }
+
+        lucide.createIcons();
+    </script>
+</body>
+</html>
