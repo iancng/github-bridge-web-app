@@ -166,12 +166,21 @@
                     </div>
                     <div>
                         <h2 class="text-2xl font-bold text-white mb-2">Deployment Successful!</h2>
-                        <p class="text-slate-400 max-w-md mx-auto">
-                            Your code has been pushed. GitHub Pages is building your site now (usually takes 1-2 mins).
+                        <p class="text-slate-400 max-w-md mx-auto mb-2">
+                            Your code has been pushed. GitHub Pages is building your site.
                         </p>
                     </div>
+
+                    <!-- Countdown Timer -->
+                    <div class="bg-slate-900/50 rounded-lg p-3 w-full max-w-xs border border-slate-700/50 mb-2">
+                        <p class="text-[10px] text-slate-400 mb-1 uppercase tracking-wide">Estimated Build Time</p>
+                        <div class="flex items-center justify-center gap-2 text-blue-300 font-mono text-xl font-bold">
+                            <i data-lucide="timer" class="w-5 h-5 animate-pulse"></i>
+                            <span id="timer-display">02:00</span>
+                        </div>
+                    </div>
                     
-                    <div class="flex flex-col w-full gap-3 mt-4">
+                    <div class="flex flex-col w-full gap-3 mt-2">
                         <a id="btn-visit-site" href="#" target="_blank"
                             class="w-full bg-white text-green-900 hover:bg-slate-100 py-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all">
                             Visit Live Site <i data-lucide="external-link" class="w-5 h-5"></i>
@@ -337,6 +346,9 @@
         }
 
         function resetForNewDeployment() {
+            // Stop any running timer
+            if (countdownInterval) clearInterval(countdownInterval);
+            
             state.deployedUrl = '';
             document.getElementById('input-repo-name').value = '';
             document.getElementById('log-container').innerHTML = '';
@@ -345,6 +357,7 @@
         }
 
         function handleLogout() {
+            if (countdownInterval) clearInterval(countdownInterval);
             localStorage.removeItem('gh_token');
             state.token = '';
             state.username = '';
@@ -381,6 +394,39 @@
             div.innerHTML = `<span class="opacity-50 font-mono">[${new Date().toLocaleTimeString()}]</span> <span>${type === 'info' ? '> ' : ''}${msg}</span>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
+        }
+
+        // --- Timer Logic ---
+        let countdownInterval;
+
+        function startCountdown(duration) {
+            let timer = duration, minutes, seconds;
+            const display = document.getElementById('timer-display');
+            
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            // Initial render
+            updateDisplay(timer);
+
+            countdownInterval = setInterval(function () {
+                timer--;
+                if (timer < 0) {
+                    clearInterval(countdownInterval);
+                    display.textContent = "Check Now!";
+                    return;
+                }
+                updateDisplay(timer);
+            }, 1000);
+
+            function updateDisplay(t) {
+                minutes = parseInt(t / 60, 10);
+                seconds = parseInt(t % 60, 10);
+
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                display.textContent = minutes + ":" + seconds;
+            }
         }
 
         // --- Repo Modal Functions ---
@@ -534,6 +580,9 @@
                 document.getElementById('btn-visit-site').href = finalUrl;
                 document.getElementById('btn-view-source').href = `https://github.com/${state.username}/${state.repoName}`;
                 successPanel.classList.remove('hidden');
+
+                // Start 2 min countdown (120 seconds)
+                startCountdown(120);
 
             } catch (err) {
                 addLog(`Error: ${err.message}`, 'error');
