@@ -24,7 +24,8 @@
         
         <!-- HEADER -->
         <div class="bg-slate-950 p-6 flex items-center justify-between border-b border-slate-700">
-            <div class="flex items-center gap-3">
+            <!-- Clickable Title/Icon to go Home -->
+            <div class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onclick="AppController.goHome()">
                 <div class="p-2 bg-blue-600 rounded-lg">
                     <i data-lucide="upload-cloud" class="text-white"></i>
                 </div>
@@ -272,6 +273,21 @@
         </div>
     </div>
 
+    <!-- REPO CREATION CONFIRMATION MODAL -->
+    <div id="confirm-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-800 w-full max-w-sm rounded-xl shadow-2xl border border-slate-700 p-6 text-center">
+            <h3 class="text-lg font-bold text-white mb-2">Repository Not Found</h3>
+            <p class="text-slate-400 mb-6 text-sm">
+                The repository "<span id="confirm-repo-name" class="text-white font-mono font-bold"></span>" does not exist. 
+                <br>Would you like to create it?
+            </p>
+            <div class="flex gap-3">
+                <button id="btn-cancel-create" class="flex-1 px-4 py-2 rounded-lg font-medium text-slate-300 hover:bg-slate-700 transition-colors border border-slate-600">Cancel</button>
+                <button id="btn-confirm-create" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-4 py-2 font-bold transition-all shadow-lg shadow-blue-900/20">Create Repo</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const AppState = { step: 1, token: '', username: '', userAvatar: '', repoName: '', mode: 'html', countdownInterval: null };
 
@@ -284,7 +300,6 @@
             indexCss: `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\nbody { margin: 0; font-family: sans-serif; }`,
             
             getViteConfig: (repoName) => {
-                // Determine base URL: if repo is user.github.io, base is '/', else '/repo/'
                 const isUserSite = repoName.toLowerCase().endsWith('.github.io');
                 const base = isUserSite ? '/' : `/${repoName}/`;
                 return `import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  base: '${base}',\n});`;
@@ -392,7 +407,6 @@ jobs:
                 const codeInput = document.getElementById('input-code');
 
                 if (mode === 'react') {
-                    // React Mode Styles
                     htmlBtn.className = "px-6 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition-all";
                     reactBtn.className = "px-6 py-2 rounded-md text-sm font-bold transition-all bg-blue-600 text-white shadow-lg";
                     
@@ -405,7 +419,6 @@ jobs:
                         codeInput.value = `import React, { useState } from 'react';\nimport { Folder } from 'lucide-react';\n\nexport default function App() {\n  const [count, setCount] = useState(0);\n  return (\n    <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center">\n      <h1 className="text-4xl font-bold mb-4 flex items-center gap-2">\n        <Folder /> React on GitHub Pages\n      </h1>\n      <button onClick={() => setCount(c => c + 1)} className="bg-blue-600 px-4 py-2 rounded">\n        Count is {count}\n      </button>\n    </div>\n  );\n}`;
                     }
                 } else {
-                    // HTML Mode Styles
                     htmlBtn.className = "px-6 py-2 rounded-md text-sm font-bold transition-all bg-blue-600 text-white shadow-lg";
                     reactBtn.className = "px-6 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition-all";
                     
@@ -452,6 +465,33 @@ jobs:
                     if (timer < 0) { clearInterval(AppState.countdownInterval); display.textContent = "Ready?"; return; }
                     update();
                 }, 1000);
+            },
+            askToCreateRepo(repoName) {
+                return new Promise((resolve) => {
+                    const modal = document.getElementById('confirm-modal');
+                    const nameSpan = document.getElementById('confirm-repo-name');
+                    const btnConfirm = document.getElementById('btn-confirm-create');
+                    const btnCancel = document.getElementById('btn-cancel-create');
+
+                    nameSpan.textContent = repoName;
+                    modal.classList.remove('hidden');
+
+                    // Clean up old listeners (simple cloning technique)
+                    const newConfirm = btnConfirm.cloneNode(true);
+                    const newCancel = btnCancel.cloneNode(true);
+                    btnConfirm.parentNode.replaceChild(newConfirm, btnConfirm);
+                    btnCancel.parentNode.replaceChild(newCancel, btnCancel);
+
+                    newConfirm.addEventListener('click', () => {
+                        modal.classList.add('hidden');
+                        resolve(true);
+                    });
+
+                    newCancel.addEventListener('click', () => {
+                        modal.classList.add('hidden');
+                        resolve(false);
+                    });
+                });
             }
         };
 
@@ -461,6 +501,20 @@ jobs:
                 if (savedToken) { document.getElementById('input-token').value = savedToken; await AppController.verifyToken(); }
                 lucide.createIcons();
                 UI.renderStepIndicator();
+            },
+            goHome() {
+                if (AppState.token) {
+                    // Logged in -> Go to Step 2 (Start of flow)
+                    // Reset logs/state but keep user info
+                    document.getElementById('log-container').innerHTML = '';
+                    document.getElementById('success-panel').classList.add('hidden');
+                    document.getElementById('deploy-error').classList.add('hidden');
+                    if (AppState.countdownInterval) clearInterval(AppState.countdownInterval);
+                    UI.setStep(2);
+                } else {
+                    // Not logged in -> Go to Step 1
+                    UI.setStep(1);
+                }
             },
             async verifyToken() {
                 const token = document.getElementById('input-token').value.trim();
@@ -496,8 +550,18 @@ jobs:
                     // 1. Create or Get Repo
                     UI.addLog(`Checking repository "${AppState.repoName}"...`, 'info');
                     let repo = await GitHubAPI.getRepo(AppState.token, AppState.username, AppState.repoName);
+                    
                     if (!repo) {
-                        UI.addLog(`Repository not found. Creating...`, 'info');
+                        // REPO NOT FOUND -> ASK CONFIRMATION
+                        UI.addLog(`Repository "${AppState.repoName}" not found.`, 'warning');
+                        const shouldCreate = await UI.askToCreateRepo(AppState.repoName);
+                        
+                        if (!shouldCreate) {
+                            UI.addLog('Repository creation cancelled by user.', 'error');
+                            throw new Error('Deployment cancelled. Repository does not exist and creation was declined.');
+                        }
+
+                        UI.addLog(`Creating repository "${AppState.repoName}"...`, 'info');
                         repo = await GitHubAPI.createRepo(AppState.token, AppState.repoName, 'Deployed via GitDeploy Bridge');
                         UI.addLog('Repository created.', 'success');
                         await Utils.delay(2000); // Wait for init
@@ -519,20 +583,14 @@ jobs:
                         UI.startCountdown(120); // 2 mins for HTML
                     } else {
                         // REACT MODE
-                        // This involves: package.json, vite.config.js, index.html, src/main.jsx, src/App.jsx, workflow
-                        
-                        // A. Ensure 'gh-pages' branch exists for target
-                        // We need a base SHA from main
                         const mainRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, 'heads/main');
                         if (mainRef) {
-                            // Try to create gh-pages branch if not exists
                             try {
                                 await GitHubAPI.createRef(AppState.token, AppState.username, AppState.repoName, 'gh-pages', mainRef.object.sha);
                                 UI.addLog('Created gh-pages branch.', 'info');
                             } catch(e) { /* Branch likely exists */ }
                         }
                         
-                        // B. Push Files
                         UI.addLog('Scaffolding React project structure...', 'info');
                         const files = [
                             { path: 'package.json', content: packageJson },
@@ -549,9 +607,6 @@ jobs:
                             await GitHubAPI.createFile(AppState.token, AppState.username, AppState.repoName, file.path, file.content, 'Scaffold React App');
                         }
                         
-                        // C. Enable Pages on gh-pages branch (if not enabled)
-                        // Note: The workflow will deploy here, so we set Pages to read from here.
-                        // Sometimes this fails if branch is empty, but we try anyway.
                         UI.addLog('Configuring Pages source to gh-pages...', 'info');
                         try {
                             await GitHubAPI.enablePages(AppState.token, AppState.username, AppState.repoName, 'gh-pages');
