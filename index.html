@@ -305,7 +305,7 @@
                 return `import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  base: '${base}',\n});`;
             },
 
-            // UPDATED WORKFLOW: Uses JamesIves/github-pages-deploy-action to push build to gh-pages branch
+            // UPDATED WORKFLOW: Removes cache: 'npm' and uses npm install instead of npm ci
             getWorkflow: (branch = 'main') => `name: Deploy to GitHub Pages
 
 on:
@@ -326,10 +326,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          # cache: 'npm' removed to fix lock file error
           
       - name: Install dependencies
-        run: npm ci
+        run: npm install
         
       - name: Build
         run: npm run build
