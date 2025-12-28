@@ -305,6 +305,7 @@
                 return `import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  base: '${base}',\n});`;
             },
 
+            // UPDATED WORKFLOW: Uses JamesIves/github-pages-deploy-action to push build to gh-pages branch
             getWorkflow: (branch = 'main') => `name: Deploy to GitHub Pages
 
 on:
@@ -312,44 +313,32 @@ on:
     branches: ["${branch}"]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
+          
       - name: Install dependencies
         run: npm ci
+        
       - name: Build
         run: npm run build
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        
+      - name: Deploy to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          path: ./dist
-
-  deploy:
-    environment:
-      name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4`
+          folder: dist
+          branch: gh-pages`
         };
 
         const Utils = {
@@ -368,7 +357,18 @@ jobs:
                 return { data, headers: response.headers };
             },
             async getUser(token) { const res = await this.request('/user','GET',token); return { ...res.data, tokenExpiry: res.headers.get('github-authentication-token-expiration') }; },
-            async getRepo(token, owner, repo) { try { const res = await this.request(`/repos/${owner}/${repo}`,'GET',token); return res.data; } catch(e) { if(e.message.includes('404')) return null; throw e; } },
+            
+            // FIX: Handle 404 cleanly so the "if (!repo)" logic can trigger the creation prompt
+            async getRepo(token, owner, repo) { 
+                try { 
+                    const res = await this.request(`/repos/${owner}/${repo}`,'GET',token); 
+                    return res.data; 
+                } catch(e) { 
+                    if(e.message === 'Not Found' || e.message.includes('404')) return null; 
+                    throw e; 
+                } 
+            },
+            
             async listRepos(token) { const res = await this.request('/user/repos?sort=updated&per_page=100&type=owner','GET',token); return res.data; },
             async createRepo(token, name, desc) { const res = await this.request('/user/repos','POST',token, { name, description: desc, private: false, auto_init: true }); return res.data; },
             async getRef(token, owner, repo, ref) { try { const res = await this.request(`/repos/${owner}/${repo}/git/ref/${ref}`,'GET',token); return res.data; } catch(e){ return null; } },
@@ -476,21 +476,13 @@ jobs:
                     nameSpan.textContent = repoName;
                     modal.classList.remove('hidden');
 
-                    // Clean up old listeners (simple cloning technique)
                     const newConfirm = btnConfirm.cloneNode(true);
                     const newCancel = btnCancel.cloneNode(true);
                     btnConfirm.parentNode.replaceChild(newConfirm, btnConfirm);
                     btnCancel.parentNode.replaceChild(newCancel, btnCancel);
 
-                    newConfirm.addEventListener('click', () => {
-                        modal.classList.add('hidden');
-                        resolve(true);
-                    });
-
-                    newCancel.addEventListener('click', () => {
-                        modal.classList.add('hidden');
-                        resolve(false);
-                    });
+                    newConfirm.addEventListener('click', () => { modal.classList.add('hidden'); resolve(true); });
+                    newCancel.addEventListener('click', () => { modal.classList.add('hidden'); resolve(false); });
                 });
             }
         };
@@ -504,15 +496,12 @@ jobs:
             },
             goHome() {
                 if (AppState.token) {
-                    // Logged in -> Go to Step 2 (Start of flow)
-                    // Reset logs/state but keep user info
                     document.getElementById('log-container').innerHTML = '';
                     document.getElementById('success-panel').classList.add('hidden');
                     document.getElementById('deploy-error').classList.add('hidden');
                     if (AppState.countdownInterval) clearInterval(AppState.countdownInterval);
                     UI.setStep(2);
                 } else {
-                    // Not logged in -> Go to Step 1
                     UI.setStep(1);
                 }
             },
@@ -552,26 +541,22 @@ jobs:
                     let repo = await GitHubAPI.getRepo(AppState.token, AppState.username, AppState.repoName);
                     
                     if (!repo) {
-                        // REPO NOT FOUND -> ASK CONFIRMATION
                         UI.addLog(`Repository "${AppState.repoName}" not found.`, 'warning');
                         const shouldCreate = await UI.askToCreateRepo(AppState.repoName);
-                        
                         if (!shouldCreate) {
                             UI.addLog('Repository creation cancelled by user.', 'error');
-                            throw new Error('Deployment cancelled. Repository does not exist and creation was declined.');
+                            throw new Error('Deployment cancelled.');
                         }
-
                         UI.addLog(`Creating repository "${AppState.repoName}"...`, 'info');
                         repo = await GitHubAPI.createRepo(AppState.token, AppState.repoName, 'Deployed via GitDeploy Bridge');
                         UI.addLog('Repository created.', 'success');
-                        await Utils.delay(2000); // Wait for init
+                        await Utils.delay(2000); 
                     } else {
                         UI.addLog('Repository exists.', 'success');
                     }
 
                     // 2. Deployment Logic
                     if (AppState.mode === 'html') {
-                        // SIMPLE HTML MODE
                         const fileName = document.getElementById('input-filename').value.trim();
                         UI.addLog(`Committing ${fileName}...`, 'info');
                         await GitHubAPI.createFile(AppState.token, AppState.username, AppState.repoName, fileName, mainCode, 'Deploy HTML');
@@ -580,14 +565,16 @@ jobs:
                         UI.addLog('Enabling GitHub Pages...', 'info');
                         await GitHubAPI.enablePages(AppState.token, AppState.username, AppState.repoName);
                         
-                        UI.startCountdown(120); // 2 mins for HTML
+                        UI.startCountdown(120);
                     } else {
                         // REACT MODE
+                        // Ensure gh-pages branch exists by creating it from main if possible
+                        // This allows enablePages to work immediately, even before the Action populates it
                         const mainRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, 'heads/main');
                         if (mainRef) {
                             try {
                                 await GitHubAPI.createRef(AppState.token, AppState.username, AppState.repoName, 'gh-pages', mainRef.object.sha);
-                                UI.addLog('Created gh-pages branch.', 'info');
+                                UI.addLog('Pre-created gh-pages branch (will be overwritten by build).', 'info');
                             } catch(e) { /* Branch likely exists */ }
                         }
                         
@@ -607,15 +594,14 @@ jobs:
                             await GitHubAPI.createFile(AppState.token, AppState.username, AppState.repoName, file.path, file.content, 'Scaffold React App');
                         }
                         
-                        UI.addLog('Configuring Pages source to gh-pages...', 'info');
+                        UI.addLog('Configuring Pages source to gh-pages branch...', 'info');
                         try {
                             await GitHubAPI.enablePages(AppState.token, AppState.username, AppState.repoName, 'gh-pages');
                         } catch(e) { UI.addLog('Note: Pages config might wait for first build.', 'warning'); }
 
-                        UI.startCountdown(180); // 3 mins for React Build
+                        UI.startCountdown(180);
                     }
 
-                    // 3. Finalize
                     let finalUrl = AppState.repoName.toLowerCase() === `${AppState.username.toLowerCase()}.github.io` 
                         ? `https://${AppState.username}.github.io/` 
                         : `https://${AppState.username}.github.io/${AppState.repoName}/`;
