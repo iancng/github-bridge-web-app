@@ -269,8 +269,10 @@
 
         <!-- FOOTER -->
         <div class="bg-slate-950 py-3 px-6 border-t border-slate-700 w-full flex justify-between items-center text-xs text-slate-500 font-mono rounded-b-2xl">
-            <span>v1.4.0 (Atomic Deployment)</span>
-            <span>Build: 2025-12-28 22:55 JST</span>
+            <span onclick="UI.openChangelog()" class="cursor-pointer hover:text-blue-400 transition-colors flex items-center gap-2 group">
+                <i data-lucide="history" class="w-3 h-3 group-hover:rotate-180 transition-transform"></i> v1.5.0
+            </span>
+            <span>Build: 2025-12-28 22:58 JST</span>
         </div>
     </div>
 
@@ -296,6 +298,72 @@
             <div class="flex gap-3">
                 <button id="btn-cancel-create" class="flex-1 px-4 py-2 rounded-lg font-medium text-slate-300 hover:bg-slate-700 transition-colors border border-slate-600">Cancel</button>
                 <button id="btn-confirm-create" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-4 py-2 font-bold transition-all shadow-lg shadow-blue-900/20">Create Repo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHANGELOG MODAL -->
+    <div id="changelog-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-800 w-full max-w-lg rounded-xl shadow-2xl border border-slate-700 flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50 rounded-t-xl">
+                <h3 class="font-bold text-white flex items-center gap-2">
+                    <i data-lucide="history" class="w-4 h-4 text-blue-400"></i> Version History
+                </h3>
+                <button onclick="UI.closeChangelog()" class="text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6 space-y-6 text-sm text-slate-300">
+                
+                <!-- v1.5.0 -->
+                <div class="relative pl-4 border-l-2 border-blue-500">
+                    <h4 class="font-bold text-white mb-1">v1.5.0 <span class="text-xs font-normal text-slate-500 ml-2">Current</span></h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400">
+                        <li>Added Change Log viewer.</li>
+                        <li>UI polish and accessibility improvements.</li>
+                    </ul>
+                </div>
+
+                <!-- v1.4.0 -->
+                <div class="relative pl-4 border-l-2 border-slate-700">
+                    <h4 class="font-bold text-white mb-1">v1.4.0 <span class="text-xs font-normal text-slate-500 ml-2">Atomic Update</span></h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400">
+                        <li><strong>Atomic Deployment:</strong> React apps are now deployed in a single git commit using the Git Database API.</li>
+                        <li>Eliminated multiple workflow runs during deployment.</li>
+                        <li>Improved stability for large file sets.</li>
+                    </ul>
+                </div>
+
+                <!-- v1.3.x -->
+                <div class="relative pl-4 border-l-2 border-slate-700">
+                    <h4 class="font-bold text-white mb-1">v1.3.0 - v1.3.2 <span class="text-xs font-normal text-slate-500 ml-2">React Support</span></h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400">
+                        <li>Added <strong>React App</strong> mode.</li>
+                        <li>Automatic scaffolding for Vite, <code>package.json</code>, and <code>deploy.yml</code>.</li>
+                        <li><strong>Auto-Fixer:</strong> Automatically corrects workflow files to remove <code>npm ci</code> and cache dependencies (fixing "lock file not found" errors).</li>
+                        <li>Added editor tabs for <code>package.json</code> and workflow configuration.</li>
+                    </ul>
+                </div>
+
+                <!-- v1.2.0 -->
+                <div class="relative pl-4 border-l-2 border-slate-700">
+                    <h4 class="font-bold text-white mb-1">v1.2.0 <span class="text-xs font-normal text-slate-500 ml-2">Repo Management</span></h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400">
+                        <li>Added <strong>Repository Browser</strong> to select existing repos.</li>
+                        <li>Added "Create Repository" prompt if target does not exist.</li>
+                        <li>Added <code>localStorage</code> persistence for API tokens.</li>
+                    </ul>
+                </div>
+
+                <!-- v1.0.0 -->
+                <div class="relative pl-4 border-l-2 border-slate-700">
+                    <h4 class="font-bold text-white mb-1">v1.0.0 <span class="text-xs font-normal text-slate-500 ml-2">Initial Release</span></h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400">
+                        <li>Basic HTML deployment to GitHub Pages.</li>
+                        <li>Client-side GitHub API integration.</li>
+                    </ul>
+                </div>
+
             </div>
         </div>
     </div>
@@ -531,6 +599,12 @@ jobs:
                     newConfirm.addEventListener('click', () => { modal.classList.add('hidden'); resolve(true); });
                     newCancel.addEventListener('click', () => { modal.classList.add('hidden'); resolve(false); });
                 });
+            },
+            openChangelog() {
+                document.getElementById('changelog-modal').classList.remove('hidden');
+            },
+            closeChangelog() {
+                document.getElementById('changelog-modal').classList.add('hidden');
             }
         };
 
