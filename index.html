@@ -269,8 +269,8 @@
 
         <!-- FOOTER -->
         <div class="bg-slate-950 py-3 px-6 border-t border-slate-700 w-full flex justify-between items-center text-xs text-slate-500 font-mono rounded-b-2xl">
-            <span>v1.3.0</span>
-            <span>Build: 2025-12-28 22:45 JST</span>
+            <span>v1.4.0 (Atomic Deployment)</span>
+            <span>Build: 2025-12-28 22:55 JST</span>
         </div>
     </div>
 
@@ -317,7 +317,7 @@
                 return `import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  base: '${base}',\n});`;
             },
 
-            // UPDATED WORKFLOW: Standard Vite/Pages template
+            // WORKFLOW: Standard Vite/Pages template
             getWorkflow: (branch = 'main') => `name: Deploy to GitHub Pages
 
 on:
@@ -369,7 +369,6 @@ jobs:
             },
             async getUser(token) { const res = await this.request('/user','GET',token); return { ...res.data, tokenExpiry: res.headers.get('github-authentication-token-expiration') }; },
             
-            // FIX: Handle 404 cleanly so the "if (!repo)" logic can trigger the creation prompt
             async getRepo(token, owner, repo) { 
                 try { 
                     const res = await this.request(`/repos/${owner}/${repo}`,'GET',token); 
@@ -397,6 +396,22 @@ jobs:
             async enablePages(token, owner, repo, branch = 'main') {
                 try { await this.request(`/repos/${owner}/${repo}/pages`, 'GET', token); return; } catch(e){}
                 return this.request(`/repos/${owner}/${repo}/pages`, 'POST', token, { source: { branch, path: '/' } });
+            },
+            // --- Atomic API Methods ---
+            async createBlob(token, owner, repo, content, encoding) {
+                return this.request(`/repos/${owner}/${repo}/git/blobs`, 'POST', token, { content, encoding });
+            },
+            async getCommit(token, owner, repo, sha) {
+                return this.request(`/repos/${owner}/${repo}/git/commits/${sha}`, 'GET', token);
+            },
+            async createTree(token, owner, repo, base_tree, tree) {
+                return this.request(`/repos/${owner}/${repo}/git/trees`, 'POST', token, { base_tree, tree });
+            },
+            async createCommit(token, owner, repo, message, tree, parents) {
+                return this.request(`/repos/${owner}/${repo}/git/commits`, 'POST', token, { message, tree, parents });
+            },
+            async updateRef(token, owner, repo, ref, sha) {
+                return this.request(`/repos/${owner}/${repo}/git/refs/${ref}`, 'PATCH', token, { sha, force: true });
             }
         };
 
@@ -426,7 +441,6 @@ jobs:
                     reactConfig.classList.remove('hidden');
                     labelMain.innerHTML = '<span>App.jsx</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Main Component</span>';
                     
-                    // Initialize deploy.yml textarea if empty
                     const deployArea = document.getElementById('input-deploy-yml');
                     if (!deployArea.value) deployArea.value = Scaffolding.getWorkflow();
 
@@ -561,7 +575,19 @@ jobs:
                 AppState.repoName = repoInput.value.trim().replace(/ /g, '-');
                 const mainCode = codeInput.value;
                 const packageJson = packageInput.value;
-                const deployYml = deployInput.value || Scaffolding.getWorkflow();
+                let deployYml = deployInput.value || Scaffolding.getWorkflow();
+
+                // Sanitization for React Workflow
+                if (AppState.mode === 'react') {
+                    if (deployYml.includes("cache: 'npm'") || deployYml.includes('cache: "npm"') || deployYml.includes('cache: npm')) {
+                        UI.addLog("Auto-fixing workflow: removing 'cache: npm'", 'warning');
+                        deployYml = deployYml.replace(/cache:\s?['"]?npm['"]?/g, "# cache: 'npm' disabled (no lock file)");
+                    }
+                    if (deployYml.includes('npm ci')) {
+                        UI.addLog("Auto-fixing workflow: replacing 'npm ci' with 'npm install'", 'warning');
+                        deployYml = deployYml.replace(/npm ci/g, 'npm install');
+                    }
+                }
 
                 UI.setStep(3);
                 document.getElementById('log-container').innerHTML = '';
@@ -578,10 +604,7 @@ jobs:
                     if (!repo) {
                         UI.addLog(`Repository "${AppState.repoName}" not found.`, 'warning');
                         const shouldCreate = await UI.askToCreateRepo(AppState.repoName);
-                        if (!shouldCreate) {
-                            UI.addLog('Repository creation cancelled by user.', 'error');
-                            throw new Error('Deployment cancelled.');
-                        }
+                        if (!shouldCreate) throw new Error('Deployment cancelled.');
                         UI.addLog(`Creating repository "${AppState.repoName}"...`, 'info');
                         repo = await GitHubAPI.createRepo(AppState.token, AppState.repoName, 'Deployed via GitDeploy Bridge');
                         UI.addLog('Repository created.', 'success');
@@ -596,24 +619,29 @@ jobs:
                         UI.addLog(`Committing ${fileName}...`, 'info');
                         await GitHubAPI.createFile(AppState.token, AppState.username, AppState.repoName, fileName, mainCode, 'Deploy HTML');
                         UI.addLog('File pushed.', 'success');
-                        
                         UI.addLog('Enabling GitHub Pages...', 'info');
                         await GitHubAPI.enablePages(AppState.token, AppState.username, AppState.repoName);
-                        
                         UI.startCountdown(120);
                     } else {
-                        // REACT MODE
-                        // Ensure gh-pages branch exists by creating it from main if possible
-                        // This allows enablePages to work immediately, even before the Action populates it
+                        // REACT MODE - ATOMIC DEPLOYMENT
                         const mainRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, 'heads/main');
-                        if (mainRef) {
-                            try {
-                                await GitHubAPI.createRef(AppState.token, AppState.username, AppState.repoName, 'gh-pages', mainRef.object.sha);
-                                UI.addLog('Pre-created gh-pages branch (will be overwritten by build).', 'info');
-                            } catch(e) { /* Branch likely exists */ }
-                        }
                         
-                        UI.addLog('Scaffolding React project structure...', 'info');
+                        // Handle new repo where main might not exist yet if only auto_init ran
+                        if (!mainRef) {
+                            // Should theoretically exist if auto_init=true, but wait if needed
+                            throw new Error("Could not find 'main' branch. Please wait a moment and try again.");
+                        }
+                        const latestCommitSha = mainRef.object.sha;
+
+                        // Ensure gh-pages branch exists
+                        try {
+                            await GitHubAPI.createRef(AppState.token, AppState.username, AppState.repoName, 'gh-pages', latestCommitSha);
+                            UI.addLog('Pre-created gh-pages branch.', 'info');
+                        } catch(e) { /* Branch likely exists */ }
+                        
+                        UI.addLog('Preparing atomic commit for React app...', 'info');
+                        
+                        // Prepare file list
                         const files = [
                             { path: 'package.json', content: packageJson },
                             { path: 'vite.config.js', content: Scaffolding.getViteConfig(AppState.repoName) },
@@ -624,12 +652,38 @@ jobs:
                             { path: '.github/workflows/deploy.yml', content: deployYml }
                         ];
 
+                        // A. Get Base Tree
+                        const commitData = await GitHubAPI.getCommit(AppState.token, AppState.username, AppState.repoName, latestCommitSha);
+                        const baseTreeSha = commitData.data.tree.sha;
+
+                        // B. Create Blobs & Tree Items
+                        const treeItems = [];
                         for (const file of files) {
-                            UI.addLog(`Pushing ${file.path}...`, 'info');
-                            await GitHubAPI.createFile(AppState.token, AppState.username, AppState.repoName, file.path, file.content, 'Scaffold React App');
+                            UI.addLog(`Processing ${file.path}...`, 'info');
+                            const blobData = await GitHubAPI.createBlob(AppState.token, AppState.username, AppState.repoName, Utils.utf8ToBase64(file.content), 'base64');
+                            treeItems.push({
+                                path: file.path,
+                                mode: '100644',
+                                type: 'blob',
+                                sha: blobData.data.sha
+                            });
                         }
+
+                        // C. Create Tree
+                        UI.addLog('Creating git tree...', 'info');
+                        const treeData = await GitHubAPI.createTree(AppState.token, AppState.username, AppState.repoName, baseTreeSha, treeItems);
+                        const newTreeSha = treeData.data.sha;
+
+                        // D. Create Commit
+                        UI.addLog('Creating commit...', 'info');
+                        const newCommitData = await GitHubAPI.createCommit(AppState.token, AppState.username, AppState.repoName, 'Deploy React App (Atomic)', newTreeSha, [latestCommitSha]);
+                        const newCommitSha = newCommitData.data.sha;
+
+                        // E. Update Reference
+                        UI.addLog('Pushing commit to main...', 'info');
+                        await GitHubAPI.updateRef(AppState.token, AppState.username, AppState.repoName, 'heads/main', newCommitSha);
                         
-                        UI.addLog('Configuring Pages source to gh-pages branch...', 'info');
+                        UI.addLog('Configuring Pages source...', 'info');
                         try {
                             await GitHubAPI.enablePages(AppState.token, AppState.username, AppState.repoName, 'gh-pages');
                         } catch(e) { UI.addLog('Note: Pages config might wait for first build.', 'warning'); }
