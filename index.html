@@ -140,7 +140,7 @@
                             <i data-lucide="package" class="w-8 h-8 text-orange-400"></i>
                             <div>
                                 <p class="font-bold text-slate-200">Vite + React Scaffolding</p>
-                                <p>Auto-generates <code>package.json</code>, <code>vite.config.js</code>, and GitHub Actions workflow.</p>
+                                <p>Auto-generates Config & Workflow.</p>
                             </div>
                         </div>
                     </div>
@@ -164,15 +164,18 @@
 </html></textarea>
                     </div>
 
-                    <!-- Package.json Input (React Mode Only) -->
-                    <div id="package-json-container" class="hidden w-1/3 flex flex-col">
-                        <label class="flex items-center justify-between text-sm font-medium text-slate-400 mb-2">
-                            <span>package.json</span>
-                            <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Dependencies</span>
-                        </label>
-                        <textarea id="input-package-json"
-                            class="flex-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-4 font-mono text-xs text-blue-300 focus:ring-2 focus:ring-blue-500/50 outline-none resize-none"
-                            spellcheck="false">{
+                    <!-- Config Input (React Mode Only) -->
+                    <div id="react-config-column" class="hidden w-1/3 flex flex-col bg-slate-950 border border-slate-700 rounded-lg overflow-hidden">
+                        <!-- Tabs -->
+                        <div class="flex border-b border-slate-700">
+                            <button onclick="UI.switchConfigTab('package')" id="tab-package" class="flex-1 py-2 text-xs font-medium text-white bg-slate-800 border-r border-slate-700 transition-colors">package.json</button>
+                            <button onclick="UI.switchConfigTab('deploy')" id="tab-deploy" class="flex-1 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-950 transition-colors">deploy.yml</button>
+                        </div>
+                        
+                        <!-- Editors -->
+                        <div class="flex-1 relative">
+                            <!-- package.json editor -->
+                            <textarea id="input-package-json" class="absolute inset-0 w-full h-full bg-slate-950 p-4 font-mono text-xs text-blue-300 focus:outline-none resize-none" spellcheck="false">{
   "name": "react-app",
   "private": true,
   "version": "0.0.0",
@@ -192,6 +195,9 @@
     "vite": "^4.4.5"
   }
 }</textarea>
+                            <!-- deploy.yml editor -->
+                            <textarea id="input-deploy-yml" class="hidden absolute inset-0 w-full h-full bg-slate-950 p-4 font-mono text-xs text-yellow-300 focus:outline-none resize-none" spellcheck="false"></textarea>
+                        </div>
                     </div>
                 </div>
 
@@ -260,6 +266,12 @@
             </div>
 
         </div>
+
+        <!-- FOOTER -->
+        <div class="bg-slate-950 py-3 px-6 border-t border-slate-700 w-full flex justify-between items-center text-xs text-slate-500 font-mono rounded-b-2xl">
+            <span>v1.3.0</span>
+            <span>Build: 2025-12-28 22:45 JST</span>
+        </div>
     </div>
 
     <!-- REPO SELECTION MODAL -->
@@ -305,7 +317,7 @@
                 return `import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  base: '${base}',\n});`;
             },
 
-            // UPDATED WORKFLOW: Removes cache: 'npm' and uses npm install instead of npm ci
+            // UPDATED WORKFLOW: Standard Vite/Pages template
             getWorkflow: (branch = 'main') => `name: Deploy to GitHub Pages
 
 on:
@@ -326,7 +338,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          # cache: 'npm' removed to fix lock file error
           
       - name: Install dependencies
         run: npm install
@@ -402,7 +413,7 @@ jobs:
                 const reactBtn = document.getElementById('mode-react');
                 const filenameContainer = document.getElementById('filename-container');
                 const reactInfo = document.getElementById('react-info-container');
-                const packageJsonContainer = document.getElementById('package-json-container');
+                const reactConfig = document.getElementById('react-config-column');
                 const labelMain = document.getElementById('label-code-main');
                 const codeInput = document.getElementById('input-code');
 
@@ -412,9 +423,13 @@ jobs:
                     
                     filenameContainer.classList.add('hidden');
                     reactInfo.classList.remove('hidden');
-                    packageJsonContainer.classList.remove('hidden');
+                    reactConfig.classList.remove('hidden');
                     labelMain.innerHTML = '<span>App.jsx</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Main Component</span>';
                     
+                    // Initialize deploy.yml textarea if empty
+                    const deployArea = document.getElementById('input-deploy-yml');
+                    if (!deployArea.value) deployArea.value = Scaffolding.getWorkflow();
+
                     if (codeInput.value.includes('<!DOCTYPE html>')) {
                         codeInput.value = `import React, { useState } from 'react';\nimport { Folder } from 'lucide-react';\n\nexport default function App() {\n  const [count, setCount] = useState(0);\n  return (\n    <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center">\n      <h1 className="text-4xl font-bold mb-4 flex items-center gap-2">\n        <Folder /> React on GitHub Pages\n      </h1>\n      <button onClick={() => setCount(c => c + 1)} className="bg-blue-600 px-4 py-2 rounded">\n        Count is {count}\n      </button>\n    </div>\n  );\n}`;
                     }
@@ -424,8 +439,26 @@ jobs:
                     
                     filenameContainer.classList.remove('hidden');
                     reactInfo.classList.add('hidden');
-                    packageJsonContainer.classList.add('hidden');
+                    reactConfig.classList.add('hidden');
                     labelMain.innerHTML = '<span>HTML Code</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Paste Here</span>';
+                }
+            },
+            switchConfigTab(tab) {
+                const pkgTab = document.getElementById('tab-package');
+                const deployTab = document.getElementById('tab-deploy');
+                const pkgInput = document.getElementById('input-package-json');
+                const deployInput = document.getElementById('input-deploy-yml');
+
+                if (tab === 'package') {
+                    pkgTab.className = "flex-1 py-2 text-xs font-medium text-white bg-slate-800 border-r border-slate-700 transition-colors";
+                    deployTab.className = "flex-1 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-950 transition-colors";
+                    pkgInput.classList.remove('hidden');
+                    deployInput.classList.add('hidden');
+                } else {
+                    pkgTab.className = "flex-1 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-950 border-r border-slate-700 transition-colors";
+                    deployTab.className = "flex-1 py-2 text-xs font-medium text-white bg-slate-800 transition-colors";
+                    pkgInput.classList.add('hidden');
+                    deployInput.classList.remove('hidden');
                 }
             },
             renderStepIndicator() {
@@ -523,10 +556,12 @@ jobs:
                 const repoInput = document.getElementById('input-repo-name');
                 const codeInput = document.getElementById('input-code');
                 const packageInput = document.getElementById('input-package-json');
+                const deployInput = document.getElementById('input-deploy-yml');
                 
                 AppState.repoName = repoInput.value.trim().replace(/ /g, '-');
                 const mainCode = codeInput.value;
                 const packageJson = packageInput.value;
+                const deployYml = deployInput.value || Scaffolding.getWorkflow();
 
                 UI.setStep(3);
                 document.getElementById('log-container').innerHTML = '';
@@ -586,7 +621,7 @@ jobs:
                             { path: 'src/main.jsx', content: Scaffolding.mainJsx },
                             { path: 'src/App.jsx', content: mainCode },
                             { path: 'src/index.css', content: Scaffolding.indexCss },
-                            { path: '.github/workflows/deploy.yml', content: Scaffolding.getWorkflow() }
+                            { path: '.github/workflows/deploy.yml', content: deployYml }
                         ];
 
                         for (const file of files) {
