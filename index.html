@@ -223,10 +223,6 @@
                 </div>
 
                 <div class="flex gap-4">
-                    <button onclick="AppController.logout()"
-                        class="px-6 py-3 rounded-lg font-medium text-slate-300 hover:bg-slate-700 transition-colors">
-                        Logout
-                    </button>
                     <button onclick="AppController.deploy()"
                         class="flex-1 bg-green-600 hover:bg-green-500 text-white rounded-lg py-3 font-bold shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 transition-all">
                         <i data-lucide="upload-cloud" class="w-5 h-5"></i> Deploy to GitHub
@@ -449,6 +445,10 @@
 
         const Utils = {
             utf8ToBase64: (str) => btoa(unescape(encodeURIComponent(str))),
+            base64ToUtf8: (str) => {
+                try { return decodeURIComponent(escape(atob(str))); } 
+                catch(e) { return atob(str); }
+            },
             delay: (ms) => new Promise(resolve => setTimeout(resolve, ms))
         };
 
@@ -554,6 +554,7 @@
                     reactConfig.classList.add('hidden');
                     labelMain.innerHTML = '<span>HTML Code</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Paste Here</span>';
                 }
+                lucide.createIcons();
             },
             switchConfigTab(tab) {
                 const pkgTab = document.getElementById('tab-package');
@@ -884,6 +885,7 @@
                     document.getElementById('deploy-error').classList.remove('hidden');
                 }
             },
+
             logout() { localStorage.removeItem('gh_token'); location.reload(); },
             resetForNew() { UI.setStep(2); document.getElementById('success-panel').classList.add('hidden'); },
             // SECURITY FIX: Using safe DOM elements instead of string interpolation mapping to prevent XSS
