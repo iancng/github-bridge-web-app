@@ -173,12 +173,7 @@
                     <div class="flex-1 flex flex-col">
                         <label id="label-code-main" class="flex items-center justify-between text-sm font-medium text-slate-400 mb-2">
                             <span>HTML Code</span>
-                            <div class="flex gap-2">
-                                <button onclick="AppController.fetchFile()" class="text-xs bg-blue-600 hover:bg-blue-500 px-2 py-0.5 rounded text-white flex items-center gap-1 transition-colors">
-                                    <i data-lucide="download" class="w-3 h-3"></i> Fetch
-                                </button>
-                                <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Paste Here</span>
-                            </div>
+                            <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Paste Here</span>
                         </label>
                         <textarea id="input-code"
                             class="flex-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-4 font-mono text-sm text-green-400 focus:ring-2 focus:ring-green-500/50 outline-none resize-none"
@@ -228,10 +223,6 @@
                 </div>
 
                 <div class="flex gap-4">
-                    <button onclick="AppController.logout()"
-                        class="px-6 py-3 rounded-lg font-medium text-slate-300 hover:bg-slate-700 transition-colors">
-                        Logout
-                    </button>
                     <button onclick="AppController.deploy()"
                         class="flex-1 bg-green-600 hover:bg-green-500 text-white rounded-lg py-3 font-bold shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 transition-all">
                         <i data-lucide="upload-cloud" class="w-5 h-5"></i> Deploy to GitHub
@@ -277,20 +268,6 @@
                             class="w-full bg-blue-600 text-white hover:bg-blue-500 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all mt-2">
                             <i data-lucide="refresh-cw" class="w-4 h-4"></i> Deploy Another App
                         </button>
-                    </div>
-
-                    <!-- Pages Configuration -->
-                    <div class="mt-4 pt-4 border-t border-slate-700/50 w-full text-left">
-                        <h3 class="text-sm font-bold text-slate-300 mb-2">Pages Configuration</h3>
-                        <p class="text-xs text-slate-500 mb-2">Configure which branch GitHub Pages uses for deployment.</p>
-                        <div class="flex gap-2">
-                            <div class="relative flex-1">
-                                <i data-lucide="git-branch" class="absolute left-3 top-2.5 text-slate-500 w-4 h-4"></i>
-                                <input type="text" id="config-pages-branch" placeholder="Branch (e.g. gh-pages)" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none">
-                            </div>
-                            <button onclick="AppController.updatePagesConfig()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">Save</button>
-                        </div>
-                        <p class="text-xs mt-1" id="pages-config-status"></p>
                     </div>
                 </div>
 
@@ -512,31 +489,9 @@
                 if (sha) body.sha = sha;
                 return this.request(`/repos/${owner}/${repo}/contents/${path}`, 'PUT', token, body);
             },
-            async getFile(token, owner, repo, path, branch='main') {
-                try {
-                    const res = await this.request(`/repos/${owner}/${repo}/contents/${path}?ref=${branch}`, 'GET', token);
-                    if (res.data && res.data.content) {
-                        return Utils.base64ToUtf8(res.data.content);
-                    }
-                    return null;
-                } catch (e) {
-                    if (e.message.includes('404') || e.message === 'Not Found') return null;
-                    throw e;
-                }
-            },
             async enablePages(token, owner, repo, branch = 'main') {
                 try { await this.request(`/repos/${owner}/${repo}/pages`, 'GET', token); return; } catch(e){}
                 return this.request(`/repos/${owner}/${repo}/pages`, 'POST', token, { source: { branch, path: '/' } });
-            },
-            async updatePages(token, owner, repo, branch) {
-                try {
-                    return await this.request(`/repos/${owner}/${repo}/pages`, 'PUT', token, { source: { branch, path: '/' } });
-                } catch (e) {
-                    if (e.message.includes('404') || e.message === 'Not Found') {
-                        return await this.request(`/repos/${owner}/${repo}/pages`, 'POST', token, { source: { branch, path: '/' } });
-                    }
-                    throw e;
-                }
             },
             // --- Atomic API Methods ---
             async createBlob(token, owner, repo, content, encoding) {
@@ -580,7 +535,7 @@
                     filenameContainer.classList.add('hidden');
                     reactInfo.classList.remove('hidden');
                     reactConfig.classList.remove('hidden');
-                    labelMain.innerHTML = `<span>App.jsx</span><div class="flex gap-2"><button onclick="AppController.fetchFile()" class="text-xs bg-blue-600 hover:bg-blue-500 px-2 py-0.5 rounded text-white flex items-center gap-1 transition-colors"><i data-lucide="download" class="w-3 h-3"></i> Fetch</button><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Main Component</span></div>`;
+                    labelMain.innerHTML = '<span>App.jsx</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Main Component</span>';
                     
                     const deployArea = document.getElementById('input-deploy-yml');
                     const targetBranch = document.getElementById('input-branch-name').value.trim() || 'main';
@@ -597,7 +552,7 @@
                     filenameContainer.classList.remove('hidden');
                     reactInfo.classList.add('hidden');
                     reactConfig.classList.add('hidden');
-                    labelMain.innerHTML = `<span>HTML Code</span><div class="flex gap-2"><button onclick="AppController.fetchFile()" class="text-xs bg-blue-600 hover:bg-blue-500 px-2 py-0.5 rounded text-white flex items-center gap-1 transition-colors"><i data-lucide="download" class="w-3 h-3"></i> Fetch</button><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Paste Here</span></div>`;
+                    labelMain.innerHTML = '<span>HTML Code</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Paste Here</span>';
                 }
                 lucide.createIcons();
             },
@@ -922,10 +877,6 @@
                     document.getElementById('btn-visit-site').href = finalUrl;
                     document.getElementById('btn-view-source').href = `https://github.com/${AppState.username}/${AppState.repoName}/tree/${AppState.branch}`;
                     
-                    // Prefill Pages Config
-                    document.getElementById('config-pages-branch').value = AppState.mode === 'html' ? AppState.branch : 'gh-pages';
-                    document.getElementById('pages-config-status').textContent = '';
-                    
                     document.getElementById('success-panel').classList.remove('hidden');
                     UI.addLog('Done! GitHub Actions should be running now.', 'success');
 
@@ -933,60 +884,6 @@
                     UI.addLog(`Error: ${e.message}`, 'error');
                     document.getElementById('deploy-error-msg').textContent = e.message;
                     document.getElementById('deploy-error').classList.remove('hidden');
-                }
-            },
-            
-            async fetchFile() {
-                const repoInput = document.getElementById('input-repo-name').value.trim();
-                const branchInput = document.getElementById('input-branch-name').value.trim() || 'main';
-                let pathInput = '';
-                
-                if (AppState.mode === 'html') {
-                    pathInput = document.getElementById('input-filename').value.trim();
-                } else {
-                    pathInput = 'src/App.jsx';
-                }
-
-                if (!repoInput || !pathInput) {
-                    UI.addLog('Repository name and path are required to fetch.', 'warning');
-                    return;
-                }
-
-                try {
-                    UI.addLog(`Fetching ${pathInput} from ${repoInput}@${branchInput}...`, 'info');
-                    const content = await GitHubAPI.getFile(AppState.token, AppState.username, repoInput, pathInput, branchInput);
-                    
-                    if (content !== null) {
-                        document.getElementById('input-code').value = content;
-                        UI.addLog(`Successfully loaded ${pathInput}.`, 'success');
-                    } else {
-                        UI.addLog(`File ${pathInput} not found.`, 'warning');
-                    }
-                } catch (e) {
-                    UI.addLog(`Failed to fetch file: ${e.message}`, 'error');
-                }
-            },
-
-            async updatePagesConfig() {
-                const branch = document.getElementById('config-pages-branch').value.trim();
-                const statusEl = document.getElementById('pages-config-status');
-                
-                if (!branch) {
-                    statusEl.textContent = 'Please enter a branch name.';
-                    statusEl.className = 'text-xs text-red-400 mt-1';
-                    return;
-                }
-
-                statusEl.textContent = 'Updating...';
-                statusEl.className = 'text-xs text-blue-400 mt-1';
-                
-                try {
-                    await GitHubAPI.updatePages(AppState.token, AppState.username, AppState.repoName, branch);
-                    statusEl.textContent = 'Settings updated successfully.';
-                    statusEl.className = 'text-xs text-green-400 mt-1';
-                } catch (e) {
-                    statusEl.textContent = `Error: ${e.message}`;
-                    statusEl.className = 'text-xs text-red-400 mt-1';
                 }
             },
 
