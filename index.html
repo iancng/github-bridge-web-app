@@ -131,10 +131,15 @@
                     <!-- Target Branch -->
                     <div class="md:col-span-1">
                         <label class="block text-sm font-medium text-slate-400 mb-1">Target Branch</label>
-                        <div class="relative">
-                            <i data-lucide="git-branch" class="absolute left-3 top-3.5 text-slate-500 w-4 h-4"></i>
-                            <input type="text" id="input-branch-name" value="main"
-                                class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        <div class="flex gap-2">
+                            <div class="relative flex-1">
+                                <i data-lucide="git-branch" class="absolute left-3 top-3.5 text-slate-500 w-4 h-4"></i>
+                                <input type="text" id="input-branch-name" value="main"
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                            <button onclick="AppController.openBranchModal()" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white p-3 rounded-lg transition-colors" title="Browse Branches">
+                                <i data-lucide="list" class="w-5 h-5"></i>
+                            </button>
                         </div>
                         <p class="text-xs text-slate-500 mt-1">Branch to push the code to.</p>
                     </div>
@@ -318,6 +323,32 @@
         </div>
     </div>
 
+    <!-- BRANCH SELECTION MODAL -->
+    <div id="branch-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-800 w-full max-w-lg rounded-xl shadow-2xl border border-slate-700 flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50 rounded-t-xl">
+                <h3 class="font-bold text-white flex items-center gap-2">Select Branch</h3>
+                <button onclick="AppController.closeBranchModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="branch-list-container" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+        </div>
+    </div>
+
+    <!-- BRANCH CREATION CONFIRMATION MODAL -->
+    <div id="confirm-branch-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-800 w-full max-w-sm rounded-xl shadow-2xl border border-slate-700 p-6 text-center">
+            <h3 class="text-lg font-bold text-white mb-2">Branch Not Found</h3>
+            <p class="text-slate-400 mb-6 text-sm">
+                The branch "<span id="confirm-branch-name" class="text-white font-mono font-bold"></span>" does not exist. 
+                <br>Would you like to create it from "<span id="confirm-base-branch-name" class="text-white font-mono font-bold"></span>"?
+            </p>
+            <div class="flex gap-3">
+                <button id="btn-cancel-create-branch" class="flex-1 px-4 py-2 rounded-lg font-medium text-slate-300 hover:bg-slate-700 transition-colors border border-slate-600">Cancel</button>
+                <button id="btn-confirm-create-branch" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-4 py-2 font-bold transition-all shadow-lg shadow-blue-900/20">Create Branch</button>
+            </div>
+        </div>
+    </div>
+
     <!-- CHANGELOG MODAL -->
     <div id="changelog-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-slate-800 w-full max-w-lg rounded-xl shadow-2xl border border-slate-700 flex flex-col max-h-[80vh]">
@@ -444,6 +475,7 @@
             },
             
             async listRepos(token) { const res = await this.request('/user/repos?sort=updated&per_page=100&type=owner','GET',token); return res.data; },
+            async listBranches(token, owner, repo) { try { const res = await this.request(`/repos/${owner}/${repo}/branches`, 'GET', token); return res.data; } catch(e) { return []; } },
             async createRepo(token, name, desc) { const res = await this.request('/user/repos','POST',token, { name, description: desc, private: false, auto_init: true }); return res.data; },
             async getRef(token, owner, repo, ref) { try { const res = await this.request(`/repos/${owner}/${repo}/git/ref/${ref}`,'GET',token); return res.data; } catch(e){ return null; } },
             async createRef(token, owner, repo, ref, sha) { return this.request(`/repos/${owner}/${repo}/git/refs`, 'POST', token, { ref: `refs/heads/${ref}`, sha }); },
@@ -609,6 +641,25 @@
                     newCancel.addEventListener('click', () => { modal.classList.add('hidden'); resolve(false); });
                 });
             },
+            askToCreateBranch(branchName, baseBranchName) {
+                return new Promise((resolve) => {
+                    const modal = document.getElementById('confirm-branch-modal');
+                    document.getElementById('confirm-branch-name').textContent = branchName;
+                    document.getElementById('confirm-base-branch-name').textContent = baseBranchName;
+                    modal.classList.remove('hidden');
+
+                    const btnConfirm = document.getElementById('btn-confirm-create-branch');
+                    const btnCancel = document.getElementById('btn-cancel-create-branch');
+
+                    const newConfirm = btnConfirm.cloneNode(true);
+                    const newCancel = btnCancel.cloneNode(true);
+                    btnConfirm.parentNode.replaceChild(newConfirm, btnConfirm);
+                    btnCancel.parentNode.replaceChild(newCancel, btnCancel);
+
+                    newConfirm.addEventListener('click', () => { modal.classList.add('hidden'); resolve(true); });
+                    newCancel.addEventListener('click', () => { modal.classList.add('hidden'); resolve(false); });
+                });
+            },
             openChangelog() {
                 document.getElementById('changelog-modal').classList.remove('hidden');
             },
@@ -723,6 +774,32 @@
                         UI.addLog('Repository exists.', 'success');
                     }
 
+                    // 1.5 Target Branch Verification & Creation
+                    let targetRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, `heads/${AppState.branch}`);
+                    
+                    if (!targetRef) {
+                        UI.addLog(`Branch "${AppState.branch}" not found.`, 'warning');
+                        const defaultBranch = (repo && repo.default_branch) ? repo.default_branch : 'main';
+                        const shouldCreateBranch = await UI.askToCreateBranch(AppState.branch, defaultBranch);
+                        
+                        if (!shouldCreateBranch) {
+                            throw new Error('Deployment cancelled. Branch creation aborted.');
+                        }
+                        
+                        UI.addLog(`Creating branch "${AppState.branch}" from "${defaultBranch}"...`, 'info');
+                        const defaultRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, `heads/${defaultBranch}`);
+                        
+                        if (defaultRef) {
+                            await GitHubAPI.createRef(AppState.token, AppState.username, AppState.repoName, AppState.branch, defaultRef.object.sha);
+                            targetRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, `heads/${AppState.branch}`);
+                            UI.addLog(`Created branch "${AppState.branch}".`, 'success');
+                        } else {
+                            throw new Error(`Base branch '${defaultBranch}' not found. Ensure the repository is initialized with at least one commit.`);
+                        }
+                    }
+
+                    const latestCommitSha = targetRef.object.sha;
+
                     // 2. Deployment Logic
                     if (AppState.mode === 'html') {
                         const fileName = document.getElementById('input-filename').value.trim();
@@ -734,26 +811,6 @@
                         UI.startCountdown(120);
                     } else {
                         // REACT MODE - ATOMIC DEPLOYMENT
-                        let targetRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, `heads/${AppState.branch}`);
-                        
-                        // Handle new repo where target branch might not exist yet
-                        if (!targetRef) {
-                            UI.addLog(`Branch "${AppState.branch}" not found. Attempting to create it...`, 'warning');
-                            if (repo && repo.default_branch) {
-                                const defaultRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, `heads/${repo.default_branch}`);
-                                if (defaultRef) {
-                                    await GitHubAPI.createRef(AppState.token, AppState.username, AppState.repoName, AppState.branch, defaultRef.object.sha);
-                                    targetRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, `heads/${AppState.branch}`);
-                                    UI.addLog(`Created branch "${AppState.branch}".`, 'success');
-                                }
-                            }
-                        }
-                        
-                        if (!targetRef) {
-                            throw new Error(`Could not find or create target branch '${AppState.branch}'.`);
-                        }
-                        const latestCommitSha = targetRef.object.sha;
-
                         // Ensure gh-pages branch exists
                         try {
                             await GitHubAPI.createRef(AppState.token, AppState.username, AppState.repoName, 'gh-pages', latestCommitSha);
@@ -860,7 +917,54 @@
                     list.innerHTML = '<div class="p-4 text-center text-red-400">Failed to load repositories.</div>';
                 });
             },
-            closeRepoModal() { document.getElementById('repo-modal').classList.add('hidden'); }
+            closeRepoModal() { document.getElementById('repo-modal').classList.add('hidden'); },
+            
+            async openBranchModal() { 
+                const repoName = document.getElementById('input-repo-name').value.trim();
+                if (!repoName) {
+                    UI.addLog('Please enter a repository name first to load branches.', 'warning');
+                    return;
+                }
+                
+                document.getElementById('branch-modal').classList.remove('hidden');
+                const list = document.getElementById('branch-list-container');
+                list.innerHTML = '<div class="p-4 text-center">Loading branches...</div>';
+                
+                try {
+                    const branches = await GitHubAPI.listBranches(AppState.token, AppState.username, repoName);
+                    list.innerHTML = '';
+                    
+                    if (branches.length === 0) {
+                        list.innerHTML = '<div class="p-4 text-center text-slate-400">No branches found.</div>';
+                        return;
+                    }
+                    
+                    branches.forEach(b => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = "p-3 border-b border-slate-700 hover:bg-slate-700 cursor-pointer flex justify-between";
+                        itemDiv.onclick = () => {
+                            document.getElementById('input-branch-name').value = b.name;
+                            
+                            // Trigger dynamic update for workflow file
+                            const deployArea = document.getElementById('input-deploy-yml');
+                            if (deployArea && deployArea.value.includes('branches: [')) {
+                                deployArea.value = deployArea.value.replace(/branches:\s*\["[^"]+"\]/, `branches: ["${b.name}"]`);
+                            }
+                            
+                            document.getElementById('branch-modal').classList.add('hidden');
+                        };
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = b.name;
+                        
+                        itemDiv.appendChild(nameSpan);
+                        list.appendChild(itemDiv);
+                    });
+                } catch(e) {
+                    list.innerHTML = '<div class="p-4 text-center text-red-400">Failed to load branches. Does the repo exist?</div>';
+                }
+            },
+            closeBranchModal() { document.getElementById('branch-modal').classList.add('hidden'); }
         };
 
         window.onload = AppController.init;
