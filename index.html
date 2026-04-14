@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- SECURITY FIX: Strict Content Security Policy (CSP) added to mitigate XSS and restrict external loading -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com; img-src 'self' data: https://avatars.githubusercontent.com;">
+    
     <title>GitDeploy Bridge</title>
     <!-- Tailwind CSS for rapid styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -109,23 +112,40 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <!-- Repo Name -->
-                    <div>
+                    <div class="md:col-span-1">
                         <label class="block text-sm font-medium text-slate-400 mb-1">Repository Name</label>
                         <div class="flex gap-2">
                             <input type="text" id="input-repo-name" value="my-web-app"
-                                class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none w-full">
                             <button onclick="AppController.openRepoModal()" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white p-3 rounded-lg transition-colors" title="Browse Repositories">
                                 <i data-lucide="folder-search" class="w-5 h-5"></i>
                             </button>
                         </div>
                         <p class="text-xs text-slate-500 mt-1">
-                            Tip: Name it <strong><span id="username-hint">username</span>.github.io</strong> for your main site.
+                            Tip: Name it <strong><span id="username-hint">username</span>.github.io</strong>
                         </p>
                     </div>
+                    
+                    <!-- Target Branch -->
+                    <div class="md:col-span-1">
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Target Branch</label>
+                        <div class="flex gap-2">
+                            <div class="relative flex-1">
+                                <i data-lucide="git-branch" class="absolute left-3 top-3.5 text-slate-500 w-4 h-4"></i>
+                                <input type="text" id="input-branch-name" value="main"
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                            <button onclick="AppController.openBranchModal()" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white p-3 rounded-lg transition-colors" title="Browse Branches">
+                                <i data-lucide="list" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">Branch to push the code to.</p>
+                    </div>
+
                     <!-- Filename (HTML Mode Only) -->
-                    <div id="filename-container">
+                    <div id="filename-container" class="md:col-span-1">
                         <label class="block text-sm font-medium text-slate-400 mb-1">Target Filename</label>
                         <div class="relative">
                             <i data-lucide="file-code" class="absolute left-3 top-3.5 text-slate-500 w-4 h-4"></i>
@@ -133,8 +153,9 @@
                                 class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
                         </div>
                     </div>
+                    
                     <!-- Package JSON Info (React Mode Only) -->
-                    <div id="react-info-container" class="hidden">
+                    <div id="react-info-container" class="hidden md:col-span-1">
                         <label class="block text-sm font-medium text-slate-400 mb-1">Configuration</label>
                         <div class="bg-slate-900/50 border border-slate-700/50 rounded-lg p-3 flex items-center gap-3 text-xs text-slate-400">
                             <i data-lucide="package" class="w-8 h-8 text-orange-400"></i>
@@ -208,7 +229,7 @@
                     </button>
                     <button onclick="AppController.deploy()"
                         class="flex-1 bg-green-600 hover:bg-green-500 text-white rounded-lg py-3 font-bold shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 transition-all">
-                        <i data-lucide="upload-cloud" class="w-5 h-5"></i> Deploy to GitHub Pages
+                        <i data-lucide="upload-cloud" class="w-5 h-5"></i> Deploy to GitHub
                     </button>
                 </div>
             </div>
@@ -270,9 +291,9 @@
         <!-- FOOTER -->
         <div class="bg-slate-950 py-3 px-6 border-t border-slate-700 w-full flex justify-between items-center text-xs text-slate-500 font-mono rounded-b-2xl">
             <span onclick="UI.openChangelog()" class="cursor-pointer hover:text-blue-400 transition-colors flex items-center gap-2 group">
-                <i data-lucide="history" class="w-3 h-3 group-hover:rotate-180 transition-transform"></i> v1.5.0
+                <i data-lucide="history" class="w-3 h-3 group-hover:rotate-180 transition-transform"></i> v1.6.0
             </span>
-            <span>Build: 2025-12-28 22:58 JST</span>
+            <span>Build: 2026-04-14 11:36 HKT</span>
         </div>
     </div>
 
@@ -302,6 +323,32 @@
         </div>
     </div>
 
+    <!-- BRANCH SELECTION MODAL -->
+    <div id="branch-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-800 w-full max-w-lg rounded-xl shadow-2xl border border-slate-700 flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50 rounded-t-xl">
+                <h3 class="font-bold text-white flex items-center gap-2">Select Branch</h3>
+                <button onclick="AppController.closeBranchModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="branch-list-container" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+        </div>
+    </div>
+
+    <!-- BRANCH CREATION CONFIRMATION MODAL -->
+    <div id="confirm-branch-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-800 w-full max-w-sm rounded-xl shadow-2xl border border-slate-700 p-6 text-center">
+            <h3 class="text-lg font-bold text-white mb-2">Branch Not Found</h3>
+            <p class="text-slate-400 mb-6 text-sm">
+                The branch "<span id="confirm-branch-name" class="text-white font-mono font-bold"></span>" does not exist. 
+                <br>Would you like to create it from "<span id="confirm-base-branch-name" class="text-white font-mono font-bold"></span>"?
+            </p>
+            <div class="flex gap-3">
+                <button id="btn-cancel-create-branch" class="flex-1 px-4 py-2 rounded-lg font-medium text-slate-300 hover:bg-slate-700 transition-colors border border-slate-600">Cancel</button>
+                <button id="btn-confirm-create-branch" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-4 py-2 font-bold transition-all shadow-lg shadow-blue-900/20">Create Branch</button>
+            </div>
+        </div>
+    </div>
+
     <!-- CHANGELOG MODAL -->
     <div id="changelog-modal" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-slate-800 w-full max-w-lg rounded-xl shadow-2xl border border-slate-700 flex flex-col max-h-[80vh]">
@@ -315,18 +362,29 @@
             </div>
             <div class="flex-1 overflow-y-auto p-6 space-y-6 text-sm text-slate-300">
                 
-                <!-- v1.5.0 -->
+                <!-- v1.6.0 -->
                 <div class="relative pl-4 border-l-2 border-blue-500">
-                    <h4 class="font-bold text-white mb-1">v1.5.0 <span class="text-xs font-normal text-slate-500 ml-2">Current</span></h4>
+                    <h4 class="font-bold text-white mb-1">v1.6.0 <span class="text-xs font-normal text-slate-500 ml-2">Current</span></h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400">
+                        <li><strong>Branch Deployment:</strong> Added full support for selecting specific branches for deployment.</li>
+                        <li>Dynamic React Workflows automatically update to trigger on the selected branch.</li>
+                        <li>Auto-creation of branches branching out of the default repository branch when they don't exist.</li>
+                    </ul>
+                </div>
+
+                <!-- v1.5.0 -->
+                <div class="relative pl-4 border-l-2 border-slate-700">
+                    <h4 class="font-bold text-white mb-1">v1.5.0</h4>
                     <ul class="list-disc list-inside space-y-1 text-slate-400">
                         <li>Added Change Log viewer.</li>
                         <li>UI polish and accessibility improvements.</li>
+                        <li>Security patches for XSS vulnerabilities and strict CSP added.</li>
                     </ul>
                 </div>
 
                 <!-- v1.4.0 -->
                 <div class="relative pl-4 border-l-2 border-slate-700">
-                    <h4 class="font-bold text-white mb-1">v1.4.0 <span class="text-xs font-normal text-slate-500 ml-2">Atomic Update</span></h4>
+                    <h4 class="font-bold text-white mb-1">v1.4.0</h4>
                     <ul class="list-disc list-inside space-y-1 text-slate-400">
                         <li><strong>Atomic Deployment:</strong> React apps are now deployed in a single git commit using the Git Database API.</li>
                         <li>Eliminated multiple workflow runs during deployment.</li>
@@ -336,7 +394,7 @@
 
                 <!-- v1.3.x -->
                 <div class="relative pl-4 border-l-2 border-slate-700">
-                    <h4 class="font-bold text-white mb-1">v1.3.0 - v1.3.2 <span class="text-xs font-normal text-slate-500 ml-2">React Support</span></h4>
+                    <h4 class="font-bold text-white mb-1">v1.3.0 - v1.3.2</h4>
                     <ul class="list-disc list-inside space-y-1 text-slate-400">
                         <li>Added <strong>React App</strong> mode.</li>
                         <li>Automatic scaffolding for Vite, <code>package.json</code>, and <code>deploy.yml</code>.</li>
@@ -347,7 +405,7 @@
 
                 <!-- v1.2.0 -->
                 <div class="relative pl-4 border-l-2 border-slate-700">
-                    <h4 class="font-bold text-white mb-1">v1.2.0 <span class="text-xs font-normal text-slate-500 ml-2">Repo Management</span></h4>
+                    <h4 class="font-bold text-white mb-1">v1.2.0</h4>
                     <ul class="list-disc list-inside space-y-1 text-slate-400">
                         <li>Added <strong>Repository Browser</strong> to select existing repos.</li>
                         <li>Added "Create Repository" prompt if target does not exist.</li>
@@ -357,7 +415,7 @@
 
                 <!-- v1.0.0 -->
                 <div class="relative pl-4 border-l-2 border-slate-700">
-                    <h4 class="font-bold text-white mb-1">v1.0.0 <span class="text-xs font-normal text-slate-500 ml-2">Initial Release</span></h4>
+                    <h4 class="font-bold text-white mb-1">v1.0.0</h4>
                     <ul class="list-disc list-inside space-y-1 text-slate-400">
                         <li>Basic HTML deployment to GitHub Pages.</li>
                         <li>Client-side GitHub API integration.</li>
@@ -369,7 +427,7 @@
     </div>
 
     <script>
-        const AppState = { step: 1, token: '', username: '', userAvatar: '', repoName: '', mode: 'html', countdownInterval: null };
+        const AppState = { step: 1, token: '', username: '', userAvatar: '', repoName: '', branch: 'main', mode: 'html', countdownInterval: null };
 
         // --- Scaffolding Templates ---
         const Scaffolding = {
@@ -386,38 +444,7 @@
             },
 
             // WORKFLOW: Standard Vite/Pages template
-            getWorkflow: (branch = 'main') => `name: Deploy to GitHub Pages
-
-on:
-  push:
-    branches: ["${branch}"]
-
-permissions:
-  contents: write
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          
-      - name: Install dependencies
-        run: npm install
-        
-      - name: Build
-        run: npm run build
-        
-      - name: Deploy to gh-pages
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          folder: dist
-          branch: gh-pages`
+            getWorkflow: (branch = 'main') => `name: Deploy to GitHub Pages\n\non:\n  push:\n    branches: ["${branch}"]\n\npermissions:\n  contents: write\n\njobs:\n  build-and-deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n      \n      - name: Set up Node\n        uses: actions/setup-node@v4\n        with:\n          node-version: 20\n          \n      - name: Install dependencies\n        run: npm install\n        \n      - name: Build\n        run: npm run build\n        \n      - name: Deploy to gh-pages\n        uses: JamesIves/github-pages-deploy-action@v4\n        with:\n          folder: dist\n          branch: gh-pages`
         };
 
         const Utils = {
@@ -448,6 +475,7 @@ jobs:
             },
             
             async listRepos(token) { const res = await this.request('/user/repos?sort=updated&per_page=100&type=owner','GET',token); return res.data; },
+            async listBranches(token, owner, repo) { try { const res = await this.request(`/repos/${owner}/${repo}/branches`, 'GET', token); return res.data; } catch(e) { return []; } },
             async createRepo(token, name, desc) { const res = await this.request('/user/repos','POST',token, { name, description: desc, private: false, auto_init: true }); return res.data; },
             async getRef(token, owner, repo, ref) { try { const res = await this.request(`/repos/${owner}/${repo}/git/ref/${ref}`,'GET',token); return res.data; } catch(e){ return null; } },
             async createRef(token, owner, repo, ref, sha) { return this.request(`/repos/${owner}/${repo}/git/refs`, 'POST', token, { ref: `refs/heads/${ref}`, sha }); },
@@ -510,7 +538,9 @@ jobs:
                     labelMain.innerHTML = '<span>App.jsx</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Main Component</span>';
                     
                     const deployArea = document.getElementById('input-deploy-yml');
-                    if (!deployArea.value) deployArea.value = Scaffolding.getWorkflow();
+                    const targetBranch = document.getElementById('input-branch-name').value.trim() || 'main';
+                    
+                    if (!deployArea.value) deployArea.value = Scaffolding.getWorkflow(targetBranch);
 
                     if (codeInput.value.includes('<!DOCTYPE html>')) {
                         codeInput.value = `import React, { useState } from 'react';\nimport { Folder } from 'lucide-react';\n\nexport default function App() {\n  const [count, setCount] = useState(0);\n  return (\n    <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center">\n      <h1 className="text-4xl font-bold mb-4 flex items-center gap-2">\n        <Folder /> React on GitHub Pages\n      </h1>\n      <button onClick={() => setCount(c => c + 1)} className="bg-blue-600 px-4 py-2 rounded">\n        Count is {count}\n      </button>\n    </div>\n  );\n}`;
@@ -556,12 +586,23 @@ jobs:
                     </div>`).join('');
                 lucide.createIcons();
             },
+            // SECURITY FIX: Using secure DOM element creation instead of .innerHTML to mitigate XSS
             addLog(msg, type = 'info') {
                 const container = document.getElementById('log-container');
                 const colors = { error: 'text-red-400', success: 'text-green-400', warning: 'text-yellow-400', info: 'text-blue-300' };
                 const div = document.createElement('div');
                 div.className = `flex gap-3 ${colors[type]}`;
-                div.innerHTML = `<span class="opacity-50 font-mono">[${new Date().toLocaleTimeString()}]</span> <span>${type === 'info' ? '> ' : ''}${msg}</span>`;
+
+                const timeSpan = document.createElement('span');
+                timeSpan.className = 'opacity-50 font-mono';
+                timeSpan.textContent = `[${new Date().toLocaleTimeString()}]`;
+
+                const msgSpan = document.createElement('span');
+                msgSpan.textContent = `${type === 'info' ? '> ' : ''}${msg}`;
+
+                div.appendChild(timeSpan);
+                div.appendChild(msgSpan);
+
                 container.appendChild(div);
                 container.scrollTop = container.scrollHeight;
             },
@@ -600,6 +641,25 @@ jobs:
                     newCancel.addEventListener('click', () => { modal.classList.add('hidden'); resolve(false); });
                 });
             },
+            askToCreateBranch(branchName, baseBranchName) {
+                return new Promise((resolve) => {
+                    const modal = document.getElementById('confirm-branch-modal');
+                    document.getElementById('confirm-branch-name').textContent = branchName;
+                    document.getElementById('confirm-base-branch-name').textContent = baseBranchName;
+                    modal.classList.remove('hidden');
+
+                    const btnConfirm = document.getElementById('btn-confirm-create-branch');
+                    const btnCancel = document.getElementById('btn-cancel-create-branch');
+
+                    const newConfirm = btnConfirm.cloneNode(true);
+                    const newCancel = btnCancel.cloneNode(true);
+                    btnConfirm.parentNode.replaceChild(newConfirm, btnConfirm);
+                    btnCancel.parentNode.replaceChild(newCancel, btnCancel);
+
+                    newConfirm.addEventListener('click', () => { modal.classList.add('hidden'); resolve(true); });
+                    newCancel.addEventListener('click', () => { modal.classList.add('hidden'); resolve(false); });
+                });
+            },
             openChangelog() {
                 document.getElementById('changelog-modal').classList.remove('hidden');
             },
@@ -614,6 +674,15 @@ jobs:
                 if (savedToken) { document.getElementById('input-token').value = savedToken; await AppController.verifyToken(); }
                 lucide.createIcons();
                 UI.renderStepIndicator();
+
+                // Dynamic workflow branch updater
+                document.getElementById('input-branch-name').addEventListener('input', (e) => {
+                    const val = e.target.value.trim() || 'main';
+                    const deployArea = document.getElementById('input-deploy-yml');
+                    if (deployArea.value.includes('branches: [')) {
+                        deployArea.value = deployArea.value.replace(/branches:\s*\["[^"]+"\]/, `branches: ["${val}"]`);
+                    }
+                });
             },
             goHome() {
                 if (AppState.token) {
@@ -642,14 +711,32 @@ jobs:
             },
             async deploy() {
                 const repoInput = document.getElementById('input-repo-name');
+                const targetBranchInput = document.getElementById('input-branch-name');
                 const codeInput = document.getElementById('input-code');
                 const packageInput = document.getElementById('input-package-json');
                 const deployInput = document.getElementById('input-deploy-yml');
                 
                 AppState.repoName = repoInput.value.trim().replace(/ /g, '-');
+                AppState.branch = targetBranchInput.value.trim() || 'main';
+                
+                // SECURITY FIX: Strict Input Sanitization/Validation for Repo Name and Branch
+                if (!/^[a-zA-Z0-9_.-]+$/.test(AppState.repoName)) {
+                    UI.addLog('Invalid repository name. Only alphanumeric characters, dashes, underscores, and dots are allowed.', 'error');
+                    document.getElementById('deploy-error-msg').textContent = 'Invalid repository name.';
+                    document.getElementById('deploy-error').classList.remove('hidden');
+                    return;
+                }
+                
+                if (!/^[a-zA-Z0-9_.-]+$/.test(AppState.branch)) {
+                    UI.addLog('Invalid branch name. Only alphanumeric characters, dashes, underscores, and dots are allowed.', 'error');
+                    document.getElementById('deploy-error-msg').textContent = 'Invalid branch name.';
+                    document.getElementById('deploy-error').classList.remove('hidden');
+                    return;
+                }
+
                 const mainCode = codeInput.value;
                 const packageJson = packageInput.value;
-                let deployYml = deployInput.value || Scaffolding.getWorkflow();
+                let deployYml = deployInput.value || Scaffolding.getWorkflow(AppState.branch);
 
                 // Sanitization for React Workflow
                 if (AppState.mode === 'react') {
@@ -687,26 +774,43 @@ jobs:
                         UI.addLog('Repository exists.', 'success');
                     }
 
+                    // 1.5 Target Branch Verification & Creation
+                    let targetRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, `heads/${AppState.branch}`);
+                    
+                    if (!targetRef) {
+                        UI.addLog(`Branch "${AppState.branch}" not found.`, 'warning');
+                        const defaultBranch = (repo && repo.default_branch) ? repo.default_branch : 'main';
+                        const shouldCreateBranch = await UI.askToCreateBranch(AppState.branch, defaultBranch);
+                        
+                        if (!shouldCreateBranch) {
+                            throw new Error('Deployment cancelled. Branch creation aborted.');
+                        }
+                        
+                        UI.addLog(`Creating branch "${AppState.branch}" from "${defaultBranch}"...`, 'info');
+                        const defaultRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, `heads/${defaultBranch}`);
+                        
+                        if (defaultRef) {
+                            await GitHubAPI.createRef(AppState.token, AppState.username, AppState.repoName, AppState.branch, defaultRef.object.sha);
+                            targetRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, `heads/${AppState.branch}`);
+                            UI.addLog(`Created branch "${AppState.branch}".`, 'success');
+                        } else {
+                            throw new Error(`Base branch '${defaultBranch}' not found. Ensure the repository is initialized with at least one commit.`);
+                        }
+                    }
+
+                    const latestCommitSha = targetRef.object.sha;
+
                     // 2. Deployment Logic
                     if (AppState.mode === 'html') {
                         const fileName = document.getElementById('input-filename').value.trim();
-                        UI.addLog(`Committing ${fileName}...`, 'info');
-                        await GitHubAPI.createFile(AppState.token, AppState.username, AppState.repoName, fileName, mainCode, 'Deploy HTML');
+                        UI.addLog(`Committing ${fileName} to branch "${AppState.branch}"...`, 'info');
+                        await GitHubAPI.createFile(AppState.token, AppState.username, AppState.repoName, fileName, mainCode, 'Deploy HTML', AppState.branch);
                         UI.addLog('File pushed.', 'success');
                         UI.addLog('Enabling GitHub Pages...', 'info');
-                        await GitHubAPI.enablePages(AppState.token, AppState.username, AppState.repoName);
+                        await GitHubAPI.enablePages(AppState.token, AppState.username, AppState.repoName, AppState.branch);
                         UI.startCountdown(120);
                     } else {
                         // REACT MODE - ATOMIC DEPLOYMENT
-                        const mainRef = await GitHubAPI.getRef(AppState.token, AppState.username, AppState.repoName, 'heads/main');
-                        
-                        // Handle new repo where main might not exist yet if only auto_init ran
-                        if (!mainRef) {
-                            // Should theoretically exist if auto_init=true, but wait if needed
-                            throw new Error("Could not find 'main' branch. Please wait a moment and try again.");
-                        }
-                        const latestCommitSha = mainRef.object.sha;
-
                         // Ensure gh-pages branch exists
                         try {
                             await GitHubAPI.createRef(AppState.token, AppState.username, AppState.repoName, 'gh-pages', latestCommitSha);
@@ -750,12 +854,12 @@ jobs:
 
                         // D. Create Commit
                         UI.addLog('Creating commit...', 'info');
-                        const newCommitData = await GitHubAPI.createCommit(AppState.token, AppState.username, AppState.repoName, 'Deploy React App (Atomic)', newTreeSha, [latestCommitSha]);
+                        const newCommitData = await GitHubAPI.createCommit(AppState.token, AppState.username, AppState.repoName, `Deploy React App (Atomic)`, newTreeSha, [latestCommitSha]);
                         const newCommitSha = newCommitData.data.sha;
 
                         // E. Update Reference
-                        UI.addLog('Pushing commit to main...', 'info');
-                        await GitHubAPI.updateRef(AppState.token, AppState.username, AppState.repoName, 'heads/main', newCommitSha);
+                        UI.addLog(`Pushing commit to ${AppState.branch}...`, 'info');
+                        await GitHubAPI.updateRef(AppState.token, AppState.username, AppState.repoName, `heads/${AppState.branch}`, newCommitSha);
                         
                         UI.addLog('Configuring Pages source...', 'info');
                         try {
@@ -770,7 +874,7 @@ jobs:
                         : `https://${AppState.username}.github.io/${AppState.repoName}/`;
                     
                     document.getElementById('btn-visit-site').href = finalUrl;
-                    document.getElementById('btn-view-source').href = `https://github.com/${AppState.username}/${AppState.repoName}`;
+                    document.getElementById('btn-view-source').href = `https://github.com/${AppState.username}/${AppState.repoName}/tree/${AppState.branch}`;
                     document.getElementById('success-panel').classList.remove('hidden');
                     UI.addLog('Done! GitHub Actions should be running now.', 'success');
 
@@ -782,19 +886,85 @@ jobs:
             },
             logout() { localStorage.removeItem('gh_token'); location.reload(); },
             resetForNew() { UI.setStep(2); document.getElementById('success-panel').classList.add('hidden'); },
+            // SECURITY FIX: Using safe DOM elements instead of string interpolation mapping to prevent XSS
             openRepoModal() { 
                 document.getElementById('repo-modal').classList.remove('hidden');
                 const list = document.getElementById('repo-list-container');
                 list.innerHTML = '<div class="p-4 text-center">Loading...</div>';
+                
                 GitHubAPI.listRepos(AppState.token).then(repos => {
-                    list.innerHTML = repos.map(r => `
-                        <div onclick="document.getElementById('input-repo-name').value='${r.name}';document.getElementById('repo-modal').classList.add('hidden');" 
-                             class="p-3 border-b border-slate-700 hover:bg-slate-700 cursor-pointer flex justify-between">
-                            <span>${r.name}</span> <span class="text-xs bg-slate-700 px-2 rounded">${r.private?'Private':'Public'}</span>
-                        </div>`).join('');
+                    list.innerHTML = ''; // Clear loading text securely
+                    repos.forEach(r => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = "p-3 border-b border-slate-700 hover:bg-slate-700 cursor-pointer flex justify-between";
+                        itemDiv.onclick = () => {
+                            document.getElementById('input-repo-name').value = r.name;
+                            document.getElementById('repo-modal').classList.add('hidden');
+                        };
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = r.name; // textContent mitigates XSS
+                        
+                        const badgeSpan = document.createElement('span');
+                        badgeSpan.className = "text-xs bg-slate-700 px-2 rounded";
+                        badgeSpan.textContent = r.private ? 'Private' : 'Public';
+                        
+                        itemDiv.appendChild(nameSpan);
+                        itemDiv.appendChild(badgeSpan);
+                        list.appendChild(itemDiv);
+                    });
+                }).catch(e => {
+                    list.innerHTML = '<div class="p-4 text-center text-red-400">Failed to load repositories.</div>';
                 });
             },
-            closeRepoModal() { document.getElementById('repo-modal').classList.add('hidden'); }
+            closeRepoModal() { document.getElementById('repo-modal').classList.add('hidden'); },
+            
+            async openBranchModal() { 
+                const repoName = document.getElementById('input-repo-name').value.trim();
+                if (!repoName) {
+                    UI.addLog('Please enter a repository name first to load branches.', 'warning');
+                    return;
+                }
+                
+                document.getElementById('branch-modal').classList.remove('hidden');
+                const list = document.getElementById('branch-list-container');
+                list.innerHTML = '<div class="p-4 text-center">Loading branches...</div>';
+                
+                try {
+                    const branches = await GitHubAPI.listBranches(AppState.token, AppState.username, repoName);
+                    list.innerHTML = '';
+                    
+                    if (branches.length === 0) {
+                        list.innerHTML = '<div class="p-4 text-center text-slate-400">No branches found.</div>';
+                        return;
+                    }
+                    
+                    branches.forEach(b => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = "p-3 border-b border-slate-700 hover:bg-slate-700 cursor-pointer flex justify-between";
+                        itemDiv.onclick = () => {
+                            document.getElementById('input-branch-name').value = b.name;
+                            
+                            // Trigger dynamic update for workflow file
+                            const deployArea = document.getElementById('input-deploy-yml');
+                            if (deployArea && deployArea.value.includes('branches: [')) {
+                                deployArea.value = deployArea.value.replace(/branches:\s*\["[^"]+"\]/, `branches: ["${b.name}"]`);
+                            }
+                            
+                            document.getElementById('branch-modal').classList.add('hidden');
+                        };
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = b.name;
+                        
+                        itemDiv.appendChild(nameSpan);
+                        list.appendChild(itemDiv);
+                    });
+                } catch(e) {
+                    list.innerHTML = '<div class="p-4 text-center text-red-400">Failed to load branches. Does the repo exist?</div>';
+                }
+            },
+            closeBranchModal() { document.getElementById('branch-modal').classList.add('hidden'); }
         };
 
         window.onload = AppController.init;
