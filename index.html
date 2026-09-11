@@ -104,7 +104,7 @@
                 <div class="flex justify-center mb-6">
                     <div class="bg-slate-950 p-1 rounded-lg flex border border-slate-700">
                         <button onclick="UI.toggleMode('html')" id="mode-html" class="px-6 py-2 rounded-md text-sm font-bold transition-all bg-blue-600 text-white shadow-lg">
-                            Static HTML
+                            Static HTML / JS
                         </button>
                         <button onclick="UI.toggleMode('react')" id="mode-react" class="px-6 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-white transition-all">
                             React App
@@ -126,31 +126,32 @@
                         <p class="text-xs text-slate-500 mt-1">
                             Tip: Name it <strong><span id="username-hint">username</span>.github.io</strong>
                         </p>
-                    </div>
-                    
-                    <!-- Target Branch -->
-                    <div class="md:col-span-1">
-                        <label class="block text-sm font-medium text-slate-400 mb-1">Target Branch</label>
-                        <div class="flex gap-2">
-                            <div class="relative flex-1">
-                                <i data-lucide="git-branch" class="absolute left-3 top-3.5 text-slate-500 w-4 h-4"></i>
-                                <input type="text" id="input-branch-name" value="main"
-                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
-                            </div>
-                            <button onclick="AppController.openBranchModal()" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white p-3 rounded-lg transition-colors" title="Browse Branches">
-                                <i data-lucide="list" class="w-5 h-5"></i>
-                            </button>
-                        </div>
-                        <p class="text-xs text-slate-500 mt-1">Branch to push the code to.</p>
-                    </div>
-
                     <!-- Filename (HTML Mode Only) -->
                     <div id="filename-container" class="md:col-span-1">
-                        <label class="block text-sm font-medium text-slate-400 mb-1">Target Filename</label>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-sm font-medium text-slate-400">Target Filename</label>
+                            <span class="text-[11px] text-slate-500 font-mono">HTML / JS / CSS</span>
+                        </div>
                         <div class="relative">
                             <i data-lucide="file-code" class="absolute left-3 top-3.5 text-slate-500 w-4 h-4"></i>
-                            <input type="text" id="input-filename" value="index.html"
+                            <input type="text" id="input-filename" value="index.html" oninput="UI.onFilenameChange()"
                                 class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <!-- Quick Filename Presets -->
+                        <div class="flex items-center gap-1.5 mt-2">
+                            <span class="text-[11px] text-slate-500">Presets:</span>
+                            <button type="button" onclick="UI.setFilenamePreset('index.html')" 
+                                class="text-[11px] px-2 py-0.5 rounded bg-slate-700/60 hover:bg-blue-600 hover:text-white text-slate-300 transition-colors">
+                                index.html
+                            </button>
+                            <button type="button" onclick="UI.setFilenamePreset('app.js')" 
+                                class="text-[11px] px-2 py-0.5 rounded bg-slate-700/60 hover:bg-yellow-600 hover:text-white text-slate-300 transition-colors">
+                                app.js
+                            </button>
+                            <button type="button" onclick="UI.setFilenamePreset('script.js')" 
+                                class="text-[11px] px-2 py-0.5 rounded bg-slate-700/60 hover:bg-yellow-600 hover:text-white text-slate-300 transition-colors">
+                                script.js
+                            </button>
                         </div>
                     </div>
                     
@@ -171,10 +172,23 @@
                 <div class="flex gap-6 h-96">
                     <!-- Main Code Input -->
                     <div class="flex-1 flex flex-col">
-                        <label id="label-code-main" class="flex items-center justify-between text-sm font-medium text-slate-400 mb-2">
-                            <span>HTML Code</span>
-                            <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Paste Here</span>
-                        </label>
+                        <div class="flex items-center justify-between mb-2">
+                            <label id="label-code-main" class="flex items-center gap-2 text-sm font-medium text-slate-400">
+                                <span>Code Content</span>
+                                <span id="file-badge" class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">HTML / JS</span>
+                            </label>
+                            <div id="code-presets" class="flex items-center gap-1 text-xs">
+                                <span class="text-slate-500 mr-1">Load Template:</span>
+                                <button type="button" onclick="UI.loadTemplate('html')" 
+                                    class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-blue-400 rounded border border-slate-700 transition-colors">
+                                    HTML
+                                </button>
+                                <button type="button" onclick="UI.loadTemplate('js')" 
+                                    class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-yellow-400 rounded border border-slate-700 transition-colors">
+                                    JS (Script / Library)
+                                </button>
+                            </div>
+                        </div>
                         <textarea id="input-code"
                             class="flex-1 w-full bg-slate-950 border border-slate-700 rounded-lg p-4 font-mono text-sm text-green-400 focus:ring-2 focus:ring-green-500/50 outline-none resize-none"
                             spellcheck="false"><!DOCTYPE html>
@@ -258,7 +272,7 @@
                     <div class="flex flex-col w-full gap-3 mt-2">
                         <a id="btn-visit-site" href="#" target="_blank"
                             class="w-full bg-white text-green-900 hover:bg-slate-100 py-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all">
-                            Visit Live Site <i data-lucide="external-link" class="w-5 h-5"></i>
+                            <span id="btn-visit-site-label">Visit Live Site</span> <i data-lucide="external-link" class="w-5 h-5"></i>
                         </a>
                         <a id="btn-view-source" href="#" target="_blank"
                             class="w-full bg-slate-800 text-slate-300 hover:bg-slate-700 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-all">
@@ -287,9 +301,9 @@
         <!-- FOOTER -->
         <div class="bg-slate-950 py-3 px-6 border-t border-slate-700 w-full flex justify-between items-center text-xs text-slate-500 font-mono rounded-b-2xl">
             <span onclick="UI.openChangelog()" class="cursor-pointer hover:text-blue-400 transition-colors flex items-center gap-2 group">
-                <i data-lucide="history" class="w-3 h-3 group-hover:rotate-180 transition-transform"></i> v1.6.0
+                <i data-lucide="history" class="w-3 h-3 group-hover:rotate-180 transition-transform"></i> v1.7.0
             </span>
-            <span>Build: 2026-04-14 11:36 HKT</span>
+            <span>Build: 2026-09-11 15:45 HKT</span>
         </div>
     </div>
 
@@ -358,9 +372,19 @@
             </div>
             <div class="flex-1 overflow-y-auto p-6 space-y-6 text-sm text-slate-300">
                 
-                <!-- v1.6.0 -->
+                <!-- v1.7.0 -->
                 <div class="relative pl-4 border-l-2 border-blue-500">
-                    <h4 class="font-bold text-white mb-1">v1.6.0 <span class="text-xs font-normal text-slate-500 ml-2">Current</span></h4>
+                    <h4 class="font-bold text-white mb-1">v1.7.0 <span class="text-xs font-normal text-slate-500 ml-2">Current</span></h4>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400">
+                        <li><strong>Standalone JavaScript (`.js`) Deployment:</strong> You can now deploy raw JS files, utilities, or browser libraries in addition to full HTML web applications.</li>
+                        <li><strong>Smart File URL Routing:</strong> Deployed JavaScript files and sub-assets now automatically resolve to direct file URLs (e.g. <code>https://user.github.io/repo/app.js</code>) rather than root directories.</li>
+                        <li><strong>Presets & Templates:</strong> Added 1-click filename presets (<code>index.html</code>, <code>app.js</code>, <code>script.js</code>) and boilerplate template injectors for quick setup.</li>
+                    </ul>
+                </div>
+
+                <!-- v1.6.0 -->
+                <div class="relative pl-4 border-l-2 border-slate-700">
+                    <h4 class="font-bold text-white mb-1">v1.6.0</h4>
                     <ul class="list-disc list-inside space-y-1 text-slate-400">
                         <li><strong>Branch Deployment:</strong> Added full support for selecting specific branches for deployment.</li>
                         <li>Dynamic React Workflows automatically update to trigger on the selected branch.</li>
@@ -433,6 +457,10 @@
             
             indexCss: `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\nbody { margin: 0; font-family: sans-serif; }`,
             
+            htmlTemplate: `<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>Web App</title>\n</head>\n<body>\n    <h1>Deployed via GitDeploy Bridge</h1>\n</body>\n</html>`,
+
+            jsTemplate: `/**\n * Standalone JavaScript Application / Library\n * Hosted via GitHub Pages\n */\n\n(function() {\n    'use strict';\n    console.log('Script initialized from GitHub Pages!');\n    \n    // Export or execute your library / application logic here\n    window.MyHostedScript = {\n        version: '1.0.0',\n        greet: function(name) {\n            return \`Hello, \${name || 'World'}!\`;\n        }\n    };\n})();`,
+
             getViteConfig: (repoName) => {
                 const isUserSite = repoName.toLowerCase().endsWith('.github.io');
                 const base = isUserSite ? '/' : `/${repoName}/`;
@@ -526,6 +554,7 @@
                 const reactInfo = document.getElementById('react-info-container');
                 const reactConfig = document.getElementById('react-config-column');
                 const labelMain = document.getElementById('label-code-main');
+                const codePresets = document.getElementById('code-presets');
                 const codeInput = document.getElementById('input-code');
 
                 if (mode === 'react') {
@@ -535,6 +564,7 @@
                     filenameContainer.classList.add('hidden');
                     reactInfo.classList.remove('hidden');
                     reactConfig.classList.remove('hidden');
+                    if (codePresets) codePresets.classList.add('hidden');
                     labelMain.innerHTML = '<span>App.jsx</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Main Component</span>';
                     
                     const deployArea = document.getElementById('input-deploy-yml');
@@ -542,7 +572,7 @@
                     
                     if (!deployArea.value) deployArea.value = Scaffolding.getWorkflow(targetBranch);
 
-                    if (codeInput.value.includes('<!DOCTYPE html>')) {
+                    if (codeInput.value.includes('<!DOCTYPE html>') || codeInput.value.includes('window.MyHostedScript')) {
                         codeInput.value = `import React, { useState } from 'react';\nimport { Folder } from 'lucide-react';\n\nexport default function App() {\n  const [count, setCount] = useState(0);\n  return (\n    <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center">\n      <h1 className="text-4xl font-bold mb-4 flex items-center gap-2">\n        <Folder /> React on GitHub Pages\n      </h1>\n      <button onClick={() => setCount(c => c + 1)} className="bg-blue-600 px-4 py-2 rounded">\n        Count is {count}\n      </button>\n    </div>\n  );\n}`;
                     }
                 } else {
@@ -552,9 +582,54 @@
                     filenameContainer.classList.remove('hidden');
                     reactInfo.classList.add('hidden');
                     reactConfig.classList.add('hidden');
-                    labelMain.innerHTML = '<span>HTML Code</span><span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-slate-300">Paste Here</span>';
+                    if (codePresets) codePresets.classList.remove('hidden');
+                    this.onFilenameChange();
                 }
                 lucide.createIcons();
+            },
+            setFilenamePreset(filename) {
+                const filenameInput = document.getElementById('input-filename');
+                filenameInput.value = filename;
+                this.onFilenameChange();
+                
+                const codeInput = document.getElementById('input-code');
+                if (filename.endsWith('.js') && codeInput.value.includes('<!DOCTYPE html>')) {
+                    this.loadTemplate('js');
+                } else if (filename.endsWith('.html') && codeInput.value.includes('window.MyHostedScript')) {
+                    this.loadTemplate('html');
+                }
+            },
+            onFilenameChange() {
+                const filename = document.getElementById('input-filename').value.trim();
+                const badge = document.getElementById('file-badge');
+                if (!badge) return;
+
+                if (filename.endsWith('.js')) {
+                    badge.textContent = 'JavaScript';
+                    badge.className = 'text-xs bg-yellow-900/40 text-yellow-300 border border-yellow-800/50 px-2 py-0.5 rounded';
+                } else if (filename.endsWith('.html') || filename.endsWith('.htm')) {
+                    badge.textContent = 'HTML Document';
+                    badge.className = 'text-xs bg-blue-900/40 text-blue-300 border border-blue-800/50 px-2 py-0.5 rounded';
+                } else {
+                    badge.textContent = filename || 'Source Code';
+                    badge.className = 'text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded';
+                }
+            },
+            loadTemplate(type) {
+                const codeInput = document.getElementById('input-code');
+                const filenameInput = document.getElementById('input-filename');
+                if (type === 'js') {
+                    codeInput.value = Scaffolding.jsTemplate;
+                    if (filenameInput.value === 'index.html') {
+                        filenameInput.value = 'app.js';
+                    }
+                } else {
+                    codeInput.value = Scaffolding.htmlTemplate;
+                    if (filenameInput.value.endsWith('.js')) {
+                        filenameInput.value = 'index.html';
+                    }
+                }
+                this.onFilenameChange();
             },
             switchConfigTab(tab) {
                 const pkgTab = document.getElementById('tab-package');
@@ -803,9 +878,9 @@
 
                     // 2. Deployment Logic
                     if (AppState.mode === 'html') {
-                        const fileName = document.getElementById('input-filename').value.trim();
+                        const fileName = document.getElementById('input-filename').value.trim() || 'index.html';
                         UI.addLog(`Committing ${fileName} to branch "${AppState.branch}"...`, 'info');
-                        await GitHubAPI.createFile(AppState.token, AppState.username, AppState.repoName, fileName, mainCode, 'Deploy HTML', AppState.branch);
+                        await GitHubAPI.createFile(AppState.token, AppState.username, AppState.repoName, fileName, mainCode, `Deploy ${fileName}`, AppState.branch);
                         UI.addLog('File pushed.', 'success');
                         UI.addLog('Enabling GitHub Pages...', 'info');
                         await GitHubAPI.enablePages(AppState.token, AppState.username, AppState.repoName, AppState.branch);
@@ -870,10 +945,24 @@
                         UI.startCountdown(180);
                     }
 
-                    let finalUrl = AppState.repoName.toLowerCase() === `${AppState.username.toLowerCase()}.github.io` 
+                    const fileName = document.getElementById('input-filename').value.trim();
+                    let baseSiteUrl = AppState.repoName.toLowerCase() === `${AppState.username.toLowerCase()}.github.io` 
                         ? `https://${AppState.username}.github.io/` 
                         : `https://${AppState.username}.github.io/${AppState.repoName}/`;
                     
+                    // Route directly to the deployed file if deploying standalone JS or custom file
+                    let finalUrl = baseSiteUrl;
+                    if (AppState.mode === 'html' && fileName && fileName.toLowerCase() !== 'index.html') {
+                        finalUrl = `${baseSiteUrl}${fileName}`;
+                    }
+                    
+                    const visitLabel = document.getElementById('btn-visit-site-label');
+                    if (visitLabel) {
+                        visitLabel.textContent = (AppState.mode === 'html' && fileName.endsWith('.js')) 
+                            ? 'Open Live JavaScript File' 
+                            : 'Visit Live Site';
+                    }
+
                     document.getElementById('btn-visit-site').href = finalUrl;
                     document.getElementById('btn-view-source').href = `https://github.com/${AppState.username}/${AppState.repoName}/tree/${AppState.branch}`;
                     document.getElementById('success-panel').classList.remove('hidden');
